@@ -5,50 +5,52 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import ssl
+from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models.segmentation import deeplabv3_resnet50
 
-# "There are three $3 \times 3$ convolutions in those blocks, and the last convolution contains
-# stride $2$ except the one in last block, similar to original ResNet."
+ssl._create_default_https_context = ssl._create_unverified_context
 
-# "we apply atrous convolution with rates determined by the desired output stride value."
-
-# "We employ crop size to be $513$ during both training and test on PASCAL VOC 2012 dataset."
-from torchvision.models import resnet50
-
-model = resnet50()
-model
-
-# x = torch.randn(2, 3, 256, 224)
-# # 'Conv1 + Pool1'
-# x = model.conv1(x)
-# x = model.bn1(x)
-# x = model.relu(x)
-# x = model.maxpool(x) # output_stride = 4
-# x = model.layer1(x) # output_stride = 4
-
-# x = model.layer2(x) # output_stride = 8 # 'Block1'
-# x = model.layer3(x) # output_stride = 16 # 'Block2'
-# x = model.layer4(x) # output_stride = 32 # 'Block3'
-
-x = torch.randn(2, 3, 256, 224)
-# 'Conv1 + Pool1'
-x = model.conv1(x)
-x = model.bn1(x)
-x = model.relu(x)
-x = model.maxpool(x)
-x = model.layer1(x) # output_stride = 4
-x = model.layer2(x) # output_stride = 8 # 'Block1'
-x = model.layer3(x) # output_stride = 16 # 'Block2'
+RESNET50 = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
 
 
-
-class ASPPConv(nn.Module):
-    def __init__(self, in_ch, kernel_size, stride=1, dilation=1, out_ch=256):
+class ResNet50Backbone(nn.Module):
+    def __init__(self):
         super().__init__()
 
-        self.conv = nn.Conv2d(
-            in_ch, out_ch, kernel_size=kernel_size, stride=stride, dilation=dilation, padding="same", bias=False
+        self.conv1_pool1 = nn.Sequential(
+            RESNET50.conv1, RESNET50.bn1, RESNET50.relu, RESNET50.maxpool,RESNET50.layer1,
         )
-        self.bn = nn.BatchNorm2d(out_ch)
+        self.block1 = RESNET50.layer2
+        self.block2 = RESNET50.layer3
+        self.block3 = RESNET50.layer4
+
+    def forward(self, x):
+        x = self.conv1_pool1(x) # `output_stride = 4`
+        x = self.block1(x) # `output_stride = 8`
+        x = self.block2(x) # `output_stride = 16`
+        x = self.block3(x) # `output_stride = 32`
+        return x
+
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, kernel_size, dilation):
+        super().__init__()
+
+        self.in_channels = in_channels
+        self.kernel_size = kernel_size
+        self.dilation = dilation
+
+        # "All with 256 filters and batch normalization"
+        self.conv = nn.Conv2d(
+            in_channels,
+            256,
+            kernel_size=kernel_size,
+            dilation=dilation,
+            padding="same",
+            bias=False
+        )
+        self.bn = nn.BatchNorm2d(256)
         self.relu = nn.ReLU()
     
     def forward(self, x):
@@ -58,25 +60,26 @@ class ASPPConv(nn.Module):
         return x
 
 
-class ASPPPool(nn.Module):
-    def __init__(self, out_ch=256):
+class ImagePooling(nn.Module):
+    def __init__(self):
         super().__init__()
 
-        self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.conv = nn.Conv2d(
-            64, out_ch, kernel_size=1, stride=1, padding="same", bias=False
-        )
-        self.bn = nn.BatchNorm2d(out_ch)
+        self.global_avg_pool = nn.AdaptiveAvgPool2d(output_size=1)
+        self.conv = nn.Conv2d(64, 256, kernel_size=1, bias=False)
+        self.bn = nn.BatchNorm2d(256)
         self.relu = nn.ReLU()
     
-    def forward(self, x):
+    def forward(self, x): # `(b, 64, h, w)`
         _, _, w, h = x.shape
 
-        x = self.global_avg_pool(x)
-        x = self.conv(x)
+        # "We apply global average pooling on the last feature map of the model, feed
+        # the resulting image-level features to a 1×1 convolution with $256$ filters
+        # (and batch normalization), and then bilinearly upsample the feature to the desired spatial dimension.
+        x = self.global_avg_pool(x) # `(b, 64, 1, 1)`
+        x = self.conv(x) # `(b, 256, 1, 1)`
         x = self.bn(x)
         x = self.relu(x)
-        x = F.interpolate(x, size=(w, h), mode="bilinear", align_corners=False)
+        x = F.interpolate(x, size=(w, h), mode="bilinear", align_corners=False) # `(b, 256, h, w)`
         return x
 
 
@@ -84,58 +87,60 @@ class ASPP(nn.Module):
     def __init__(self, atrous_rates):
         super().__init__()
 
-        self.aspp_conv1 = ASPPConv(in_ch=64, kernel_size=1)
-        self.aspp_conv2 = ASPPConv(in_ch=64, kernel_size=3, dilation=atrous_rates[0])
-        self.aspp_conv3 = ASPPConv(in_ch=64, kernel_size=3, dilation=atrous_rates[1])
-        self.aspp_conv4 = ASPPConv(in_ch=64, kernel_size=3, dilation=atrous_rates[2])
-        self.aspp_pool = ASPPPool()
-    
-    def forward(self, x):
-        # x = torch.randn(8, 64, 720, 480)
+        self.atrous_rates = atrous_rates
 
-        x1 = self.aspp_conv1(x)
-        x2 = self.aspp_conv2(x)
-        x3 = self.aspp_conv3(x)
-        x4 = self.aspp_conv4(x)
-        x5 = self.aspp_pool(x)
-        x = torch.cat([x1, x2, x3, x4, x5], dim=1)
+        # "ASPP consists of (a) one 1×1 convolution and three 3×3 convolutions
+        # with `rates = (6, 12, 18)` when `output_stride = 16`, and (b) the image-level features.
+        # "Four parallel atrous convolutions with different atrous rates are applied on top of the feature map."
+        # "We include batch normalization within ASPP."
+        self.conv_block1 = ConvBlock(in_channels=64, kernel_size=1, dilation=1)
+        self.conv_block2 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[0])
+        self.conv_block3 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[1])
+        self.conv_block4 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[2])
+        self.image_pooling = ImagePooling()
+    
+    def forward(self, x): # `(b, 64, h, w)`
+        x1 = self.conv_block1(x) # `(b, 256, h, w)`
+        x2 = self.conv_block2(x) # `(b, 256, h, w)`
+        x3 = self.conv_block3(x) # `(b, 256, h, w)`
+        x4 = self.conv_block4(x) # `(b, 256, h, w)`
+        x5 = self.image_pooling(x) # `(b, 256, h, w)`
+        # The resulting features from all the branches are then concatenated."
+        x = torch.cat([x1, x2, x3, x4, x5], dim=1) # `(b, 256 * 5, h, w)`
         return x
 
 
+# "Our best model is the case where block7 and (r1; r2; r3) = (1; 2; 1) are employed. Inference strategy on val set: The proposed"
 class DeepLabv3(nn.Module):
-    def __init__(self, n_classes):
+    def __init__(self, output_stride=16, n_classes=21):
         super().__init__()
-        n_classes = 1_000
-        output_stride = 16
+
+        self.n_classes = n_classes
+
+        # "we apply atrous convolution with rates determined by the desired output stride value."
         if output_stride == 16:
-            atrous_rates = (6, 12, 18)
+            self.atrous_rates = (6, 12, 18)
+        elif output_stride == 8:
+            self.atrous_rates = (12, 24, 36) # Note that the rates are doubled when `output_stride = 8`.
+
+        # "There are three 3×3 convolutions in those blocks."
+        # "The last convolution contains stride $2$ except the one in last block."
+        self.backbone = ResNet50Backbone()
+        self.block4 = deeplabv3_resnet50().backbone.layer4
         
-        aspp = ASPP(atrous_rates=atrous_rates)
-        aspp_conv = ASPPConv(in_ch=1280, kernel_size=1)
-        conv = nn.Conv2d(256, n_classes, kernel_size=1)
+        self.aspp = ASPP(atrous_rates=self.atrous_rates)
+        # "Pass through another 1×1 convolution (also with 256 filters and batch normalization)
+        # before the final 1×1 convolution which generates the final logits."
+        self.conv_block = ConvBlock(in_channels=1280, kernel_size=1, dilation=1)
+        self.fin_conv = nn.Conv2d(256, n_classes, kernel_size=1)
     
     def forward(self, x):
-        x = torch.randn(8, 64, 720, 480)
-        x = aspp(x)
-        x = aspp_conv(x)
-        x = conv(x)
-        x.shape
-
-
-# class Block(nn.Module):
-#     def __init__(self, in_ch, out_ch, rate, last_stride, multi_grid=(1, 2, 4)):
-#         super().__init__()
-#         rate = 8
-#         multi_grid=(1, 2, 4)
-
-#         self.last_stride = last_stride
-#         self.multi_grid = multi_grid
-
-#         nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=1, dilation=rate * multi_grid[0])
-#         nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=1, dilation=rate * multi_grid[1])
-#         nn.Conv2d(in_ch, out_ch, kernel_size=3, stride=last_stride, dilation=rate * multi_grid[2])
-    
-
-    # def forward(self, x):
-
-
+        x = self.backbone(x)
+        x = self.block4(x)
+        x = self.aspp(x)
+        x = self.conv_block(x)
+        x = self.fin_conv(x)
+        return x
+deeplabv3 = DeepLabv3()
+x = torch.randn(2, 3, 224, 224)
+out = deeplabv3(x)
