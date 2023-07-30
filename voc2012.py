@@ -77,7 +77,7 @@ class VOC2012Dataset(Dataset):
         image, label = self._transform(image=image, label=label)
         image = TF.to_tensor(image)
         image = TF.normalize(image, mean=(0.452, 0.431, 0.399), std=(0.277, 0.273, 0.285))
-        label = TF.pil_to_tensor(label)
+        label = TF.pil_to_tensor(label).long()
         return image, label
 
 
@@ -85,5 +85,6 @@ if __name__ == "__main__":
     root_dir = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012"
     idx = 3
     ds = VOC2012Dataset(root_dir=root_dir)
-    image, label = ds[2]
-    label
+    image, label = ds[3]
+    # blended = Image.blend(image, label.convert("RGB"), alpha=0.5)
+    # blended.show()

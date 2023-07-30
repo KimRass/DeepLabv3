@@ -5,12 +5,76 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import ssl
-from torchvision.models import resnet50, ResNet50_Weights
-from torchvision.models.segmentation import deeplabv3_resnet50
+# from torchvision.models import resnet50, ResNet50_Weights
+# from torchvision.models.segmentation import deeplabv3_resnet50
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-RESNET50 = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+# RESNET50 = resnet50(weights=ResNet50_Weights.IMAGENET1K_V2)
+
+
+class Bottleneck(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1, dilation=1, downsample=None):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.conv2 = nn.Conv2d(
+            out_channels, out_channels, kernel_size=3, stride=stride, dilation=dilation, padding=dilation, bias=False
+        )
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        self.conv3 = nn.Conv2d(out_channels, out_channels * 4, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(out_channels * 4)
+        self.downsample = downsample
+        self.stride = stride
+        self.dilation = dilation
+
+    def forward(self, x):
+        skip = x.clone()
+        if self.downsample is not None:
+            skip = self.downsample(skip)
+
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.conv3(x)
+        x = self.bn3(x)
+
+        x = x + skip
+        x = F.relu(x)
+        return x
+
+
+class ResNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride, dilation, n_blocks):
+        super().__init__()
+
+        self.block = nn.Sequential()
+        self.block.add_module(
+            "conv1",
+            Bottleneck(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=stride,
+                dilation=dilation,
+                downsample=nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels * 4, kernel_size=1, stride=stride, bias=False),
+                    nn.BatchNorm2d(out_channels * 4),
+                ),
+            )
+        )
+        for i in range(2, n_blocks + 1):
+            self.block.add_module(
+                f"""conv{i}""",
+                Bottleneck(in_channels=out_channels * 4, out_channels=out_channels, stride=1, dilation=1),
+            )
+
+    def forward(self, x):
+        x = self.block(x)
+        return x
 
 
 class ResNet50Backbone(nn.Module):
@@ -18,17 +82,22 @@ class ResNet50Backbone(nn.Module):
         super().__init__()
 
         self.conv1_pool1 = nn.Sequential(
-            RESNET50.conv1, RESNET50.bn1, RESNET50.relu, RESNET50.maxpool,RESNET50.layer1,
+            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
         )
-        self.block1 = RESNET50.layer2
-        self.block2 = RESNET50.layer3
-        self.block3 = RESNET50.layer4
+        self.block1 = ResNetBlock(in_channels=64, out_channels=64, stride=2, dilation=1, n_blocks=3)
+        self.block2 = ResNetBlock(in_channels=256, out_channels=128, stride=2, dilation=1, n_blocks=4)
+        self.block3 = ResNetBlock(in_channels=512, out_channels=256, stride=2, dilation=1, n_blocks=6)
+        self.block4 = ResNetBlock(in_channels=1024, out_channels=512, stride=2, dilation=1, n_blocks=3)
 
     def forward(self, x):
-        x = self.conv1_pool1(x) # `output_stride = 4`
-        x = self.block1(x) # `output_stride = 8`
-        x = self.block2(x) # `output_stride = 16`
-        x = self.block3(x) # `output_stride = 32`
+        x = self.conv1_pool1(x) # `(b, 64, h // 4, w // 4)`
+        x = self.block1(x) # `(b, 256, h // 8, w // 8)`
+        x = self.block2(x) # `(b, 512, h // 16, w // 16)`
+        x = self.block3(x) # `(b, 1024, h // 16, w // 16)`
+        x = self.block4(x) # `(b, 2048, h // 16, w // 16)`, "$rate = 2$"
         return x
 
 
@@ -64,7 +133,7 @@ class ImagePooling(nn.Module):
         super().__init__()
 
         self.global_avg_pool = nn.AdaptiveAvgPool2d(output_size=1)
-        self.conv = nn.Conv2d(64, 256, kernel_size=1, bias=False)
+        self.conv = nn.Conv2d(2048, 256, kernel_size=1, bias=False)
         self.bn = nn.BatchNorm2d(256)
         self.relu = nn.ReLU()
     
@@ -92,10 +161,10 @@ class ASPP(nn.Module):
         # with `rates = (6, 12, 18)` when `output_stride = 16`, and (b) the image-level features.
         # "Four parallel atrous convolutions with different atrous rates are applied on top of the feature map."
         # "We include batch normalization within ASPP."
-        self.conv_block1 = ConvBlock(in_channels=64, kernel_size=1, dilation=1)
-        self.conv_block2 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[0])
-        self.conv_block3 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[1])
-        self.conv_block4 = ConvBlock(in_channels=64, kernel_size=3, dilation=atrous_rates[2])
+        self.conv_block1 = ConvBlock(in_channels=2048, kernel_size=1, dilation=1)
+        self.conv_block2 = ConvBlock(in_channels=2048, kernel_size=3, dilation=atrous_rates[0])
+        self.conv_block3 = ConvBlock(in_channels=2048, kernel_size=3, dilation=atrous_rates[1])
+        self.conv_block4 = ConvBlock(in_channels=2048, kernel_size=3, dilation=atrous_rates[2])
         self.image_pooling = ImagePooling()
     
     def forward(self, x): # `(b, 64, h, w)`
@@ -109,7 +178,6 @@ class ASPP(nn.Module):
         return x
 
 
-# "Our best model is the case where block7 and (r1; r2; r3) = (1; 2; 1) are employed. Inference strategy on val set: The proposed"
 class DeepLabv3(nn.Module):
     def __init__(self, output_stride=16, n_classes=21):
         super().__init__()
@@ -124,7 +192,6 @@ class DeepLabv3(nn.Module):
         # "There are three 3×3 convolutions in those blocks."
         # "The last convolution contains stride $2$ except the one in last block."
         self.backbone = ResNet50Backbone()
-        self.block4 = deeplabv3_resnet50().backbone.layer4
         
         self.aspp = ASPP(atrous_rates=self.atrous_rates)
         # "Pass through another 1×1 convolution (also with 256 filters and batch normalization)
@@ -133,14 +200,15 @@ class DeepLabv3(nn.Module):
         self.fin_conv = nn.Conv2d(256, n_classes, kernel_size=1)
     
     def forward(self, x):
-        x = self.backbone(x)
-        x = self.block4(x)
-        x = self.aspp(x)
-        x = self.conv_block(x)
-        x = self.fin_conv(x)
+        x = self.backbone(x) # `(b, 2048, h // 16, w // 16)`
+        x = self.aspp(x) # `(b, 1280, h // 16, w // 16)`
+        x = self.conv_block(x) # `(b, 256, h // 16, w // 16)`
+        x = self.fin_conv(x) # `(b, n_classes, h // 16, w // 16)`
         return x
-deeplabv3 = DeepLabv3()
-x = torch.randn(2, 3, 224, 224)
-out = deeplabv3(x)
 
-# "we adopt different atrous rates within block4 to block7 in the proposed model. In particular, we define as Multi Grid = (r1; r2; r3) the unit rates for the three convolutional layers within block4 to block7. The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate and the corresponding rate. For example, when output stride = 16 and Multi Grid = (1; 2; 4), the three convolutions will have rates = 2   (1; 2; 4) = (2; 4; 8) in the block4, respectively."
+
+if __name__ == "__main__":
+    deeplabv3 = DeepLabv3()
+    x = torch.randn(2, 3, 224, 224)
+    out = deeplabv3(x)
+    print(out.shape)
