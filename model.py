@@ -1,5 +1,4 @@
 # References:
-    # https://github.com/pytorch/vision/blob/main/torchvision/models/segmentation/deeplabv3.py
     # https://github.com/giovanniguidi/deeplabV3-PyTorch/tree/master/models
 
 import torch
@@ -118,10 +117,9 @@ class DeepLabv3(nn.Module):
         self.n_classes = n_classes
 
         # "we apply atrous convolution with rates determined by the desired output stride value."
+        # Note that the rates are doubled when `output_stride = 8`.
         if output_stride == 16:
             self.atrous_rates = (6, 12, 18)
-        elif output_stride == 8:
-            self.atrous_rates = (12, 24, 36) # Note that the rates are doubled when `output_stride = 8`.
 
         # "There are three 3×3 convolutions in those blocks."
         # "The last convolution contains stride $2$ except the one in last block."
@@ -144,3 +142,5 @@ class DeepLabv3(nn.Module):
 deeplabv3 = DeepLabv3()
 x = torch.randn(2, 3, 224, 224)
 out = deeplabv3(x)
+
+# "we adopt different atrous rates within block4 to block7 in the proposed model. In particular, we define as Multi Grid = (r1; r2; r3) the unit rates for the three convolutional layers within block4 to block7. The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate and the corresponding rate. For example, when output stride = 16 and Multi Grid = (1; 2; 4), the three convolutions will have rates = 2   (1; 2; 4) = (2; 4; 8) in the block4, respectively."
