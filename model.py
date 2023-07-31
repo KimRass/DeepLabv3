@@ -89,8 +89,8 @@ class ResNet50Backbone(nn.Module):
         )
         self.block1 = ResNetBlock(in_channels=64, out_channels=64, stride=2, dilation=1, n_blocks=3)
         self.block2 = ResNetBlock(in_channels=256, out_channels=128, stride=2, dilation=1, n_blocks=4)
-        self.block3 = ResNetBlock(in_channels=512, out_channels=256, stride=2, dilation=1, n_blocks=6)
-        self.block4 = ResNetBlock(in_channels=1024, out_channels=512, stride=2, dilation=1, n_blocks=3)
+        self.block3 = ResNetBlock(in_channels=512, out_channels=256, stride=1, dilation=1, n_blocks=6)
+        self.block4 = ResNetBlock(in_channels=1024, out_channels=512, stride=1, dilation=1, n_blocks=3)
 
     def forward(self, x):
         x = self.conv1_pool1(x) # `(b, 64, h // 4, w // 4)`
