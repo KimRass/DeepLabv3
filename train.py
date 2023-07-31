@@ -16,24 +16,26 @@ def get_lr(step, n_steps, power=0.9):
 
 # "A batch size of 16."
 IMG_SIZE = 513
-N_EPOCHS = 10
+N_EPOCHS = 50
 BATCH_SIZE = 16
 # N_WORKERS = 4
 N_WORKERS = 0
 DATA_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012"
 ROOT_DIR = Path(__file__).parent
-LR = 0.001
-WEIGHT_DECAY = 0.9997
+LR = 0.0005
+MOMENTUM = 0.9
+WEIGHT_DECAY = 0.0005
 
 model = DeepLabv3()
-ds = VOC2012Dataset(root_dir=DATA_DIR)
+train_ds = VOC2012Dataset(root_dir=DATA_DIR)
 train_dl = DataLoader(
-    ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+    train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
 )
+train_di = iter(train_dl)
 
 crit = DeepLabLoss()
-# optim = Adam(params=model.parameters(), lr=LR, betas=(BETA1, BETA2), eps=EPS)
-optim = SGD(params=model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+# optim = SGD(params=model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+optim = SGD(params=model.parameters(), lr=LR)
 
 # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
 # by $1 - \frac{iter}{max_iter}^{power}$ with $power = 0.9$."
@@ -48,24 +50,29 @@ lr = get_lr(step=33, n_steps=700)
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed when setting the CRF parameters."
 
+N_STEPS = 30000
 model.train()
-for epoch in range(1, N_EPOCHS + 1):
-    for batch, (image, label) in enumerate(train_dl, start=1):
-        step = len(train_dl) * (epoch - 1) + batch
-        lr = get_lr(step=step, n_steps=N_EPOCHS * len(train_dl))
-        optim.param_groups[0]["lr"] = lr
+for step in range(1, N_STEPS + 1):
+    image, gt = next(train_di)
 
-        optim.zero_grad()
+    lr = get_lr(step=step, n_steps=N_STEPS)
+    optim.param_groups[0]["lr"] = lr
 
-        pred = model(image)
-        pred = F.interpolate(pred, size=IMG_SIZE)
-        
-        loss = crit(pred=pred, gt=label)
-        loss.backward()
-        optim.step()
+    optim.zero_grad()
 
-        if batch % 100 == 0:
-            print(f"""{loss.item():.6f}""")
+    pred = model(image)
+    pred = F.interpolate(pred, size=IMG_SIZE)
+    
+    loss = crit(pred=pred, gt=gt)
+    loss.backward()
+    optim.step()
+
+    if batch % 100 == 0:
+        print(f"""{loss.item():.6f}""")
+
+    if step >= N_STEPS:
+        train_di = iter(train_dl)
 
 optim.param_groups[0].keys()
 optim.param_groups[0]["lr"]
+1000 * 16
