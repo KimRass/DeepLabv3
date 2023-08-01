@@ -1,15 +1,19 @@
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torch.optim import SGD
 from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
+import random
 
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3
 from loss import DeepLabLoss
+from evaluate import PixelmIoU
 
 
 def get_lr(step, n_steps, power=0.9):
+    # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
+    # by $1 - \frac{iter}{max_iter}^{power}$ with $power = 0.9$."
     lr = 1 - (step / n_steps) ** power
     return lr
 
@@ -27,19 +31,23 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0005
 
 model = DeepLabv3()
-train_ds = VOC2012Dataset(root_dir=DATA_DIR)
+ds = VOC2012Dataset(root_dir=DATA_DIR)
+val_size = round(len(ds) * 0.05)
+train_size = len(ds) - val_size
+train_ds, val_ds = random_split(ds, lengths=(train_size, val_size))
 train_dl = DataLoader(
     train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
 )
 train_di = iter(train_dl)
 
+val_dl = DataLoader(
+    val_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+)
+val_di = iter(val_dl)
+
 crit = DeepLabLoss()
 # optim = SGD(params=model.parameters(), lr=LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 optim = SGD(params=model.parameters(), lr=LR)
-
-# "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
-# by $1 - \frac{iter}{max_iter}^{power}$ with $power = 0.9$."
-lr = get_lr(step=33, n_steps=700)
 
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16. The batch normalization parameters
@@ -50,10 +58,15 @@ lr = get_lr(step=33, n_steps=700)
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed when setting the CRF parameters."
 
+metric = PixelmIoU()
+
 N_STEPS = 30000
-model.train()
 for step in range(1, N_STEPS + 1):
-    image, gt = next(train_di)
+    try:
+        image, gt = next(train_di)
+    except StopIteration:
+        train_di = iter(train_dl)
+        image, gt = next(train_di)
 
     lr = get_lr(step=step, n_steps=N_STEPS)
     optim.param_groups[0]["lr"] = lr
@@ -61,18 +74,28 @@ for step in range(1, N_STEPS + 1):
     optim.zero_grad()
 
     pred = model(image)
-    pred = F.interpolate(pred, size=IMG_SIZE)
     
     loss = crit(pred=pred, gt=gt)
     loss.backward()
     optim.step()
 
-    if batch % 100 == 0:
-        print(f"""{loss.item():.6f}""")
+    # if step % 100 == 0:
+    print(f"""Loss: {loss.item():.6f}""")
 
-    if step >= N_STEPS:
-        train_di = iter(train_dl)
+    ### Evaluate.
+    # if step % 100 == 0:
+    # model.eval()
+    for _ in range(3):
+        try:
+            image, gt = next(val_di)
+            pred = model(image)
+            miou = metric(pred=pred, gt=gt)
+            print(f"""mIoU: {miou:.6f}""")
+        except StopIteration:
+            val_di = iter(val_dl)
+            image, gt = next(val_di)
 
-optim.param_groups[0].keys()
-optim.param_groups[0]["lr"]
-1000 * 16
+            pred = model(image)
+            pred = F.interpolate(pred, size=IMG_SIZE)
+
+    # model.train()

@@ -198,12 +198,16 @@ class DeepLabv3(nn.Module):
         # before the final 1×1 convolution which generates the final logits."
         self.conv_block = ConvBlock(in_channels=1280, kernel_size=1, dilation=1)
         self.fin_conv = nn.Conv2d(256, n_classes, kernel_size=1)
-    
+
     def forward(self, x):
+        _, _, h, w = x.shape
+
         x = self.backbone(x) # `(b, 2048, h // 16, w // 16)`
         x = self.aspp(x) # `(b, 1280, h // 16, w // 16)`
         x = self.conv_block(x) # `(b, 256, h // 16, w // 16)`
         x = self.fin_conv(x) # `(b, n_classes, h // 16, w // 16)`
+
+        x = F.interpolate(x, size=(h, w))
         return x
 
 
