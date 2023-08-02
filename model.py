@@ -1,5 +1,5 @@
 # References:
-    # https://github.com/giovanniguidi/deeplabV3-PyTorch/tree/master/models
+    # https://github.com/VainF/DeepLabV3Plus-Pytorch
 
 import torch
 import torch.nn as nn
@@ -11,6 +11,7 @@ from torchvision.models import resnet101, ResNet101_Weights
 ssl._create_default_https_context = ssl._create_unverified_context
 
 res = resnet101(weights=ResNet101_Weights.DEFAULT)
+res
 res.layer1
 
 
