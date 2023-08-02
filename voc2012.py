@@ -69,7 +69,10 @@ class VOC2012Dataset(Dataset):
 
     def __getitem__(self, idx):
         label_path = self.labels[idx]
+        label_path = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug/2007_000733.png"
         label = Image.open(label_path)
+        label.show()
+        np.unique(np.array(label))
 
         img_path = f"""{label_path.parent.parent/"JPEGImages"/label_path.stem}.jpg"""
         image = Image.open(img_path).convert("RGB")

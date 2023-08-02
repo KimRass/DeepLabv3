@@ -1,39 +1,37 @@
 # References:
-    # https://github.com/VainF/DeepLabV3Plus-Pytorch
+    # https://github.com/PengtaoJiang/OAA-PyTorch/blob/master/deeplab-pytorch/libs/models/deeplabv3.py
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import ssl
 from torchvision.models import resnet101, ResNet101_Weights
-# from torchvision.models.segmentation import deeplabv3_resnet50
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-res = resnet101(weights=ResNet101_Weights.DEFAULT)
-res
-res.layer1
+RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
 
 
-# "We define as `Multi_Grid = (r1, r2, r3)` the unit rates for the three convolutional layers within block4.
-# The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate
-# and the corresponding rate."
 class Bottleneck(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1, dilation=1, downsample=None):
         super().__init__()
 
-        self.downsample = downsample
-        self.stride = stride
-        self.dilation = dilation
-
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
         self.conv2 = nn.Conv2d(
-            out_channels, out_channels, kernel_size=3, stride=stride, dilation=dilation, padding=dilation, bias=False
+            out_channels,
+            out_channels,
+            kernel_size=3,
+            stride=stride,
+            dilation=dilation,
+            padding=dilation,
+            bias=False
         )
         self.bn2 = nn.BatchNorm2d(out_channels)
         self.conv3 = nn.Conv2d(out_channels, out_channels * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(out_channels * 4)
+
+        self.downsample = downsample
 
     def forward(self, x):
         skip = x.clone()
@@ -75,15 +73,18 @@ class ResNetBlock(nn.Module):
             self.layers.append(
                 Bottleneck(in_channels=out_channels * 4, out_channels=out_channels, stride=1, dilation=1),
             )
-        self.layers = nn.Sequential(*self.layers)(x)
+        self.layers = nn.Sequential(*self.layers)
 
     def forward(self, x):
         x = self.layers(x)
         return x
 
 
-class Block4(nn.Module):
-    def __init__(self, in_channels, out_channels, stride, dilation, n_blocks):
+# "We define as `multi_grid = (r1, r2, r3)` the unit rates for the three convolutional layers within block4.
+# The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate
+# and the corresponding rate."
+class MultiGridResNetBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride, rate, multi_grid):
         super().__init__()
 
         self.layers = list()
@@ -92,71 +93,59 @@ class Block4(nn.Module):
                 in_channels=in_channels,
                 out_channels=out_channels,
                 stride=stride,
-                dilation=dilation,
+                dilation=rate * multi_grid[0],
                 downsample=nn.Sequential(
                     nn.Conv2d(in_channels, out_channels * 4, kernel_size=1, stride=stride, bias=False),
                     nn.BatchNorm2d(out_channels * 4),
                 ),
             )
         )
-        for _ in range(n_blocks - 1):
+        for grid in multi_grid[1:]:
             self.layers.append(
-                Bottleneck(in_channels=out_channels * 4, out_channels=out_channels, stride=1, dilation=1),
+                Bottleneck(
+                    in_channels=out_channels * 4, out_channels=out_channels, stride=1, dilation=rate * grid
+                ),
             )
-        self.layers = nn.Sequential(*self.layers)(x)
+        self.layers = nn.Sequential(*self.layers)
 
     def forward(self, x):
         x = self.layers(x)
         return x
-    
-
-def _make_MG_unit(self, BottleNeck, planes, blocks, stride=1, dilation=1, BatchNorm=None):
-    blocks = [1, 2, 4]
-    downsample = None
-    if stride != 1 or self.inplanes != 512 * 4:
-        downsample = nn.Sequential(
-            nn.Conv2d(self.inplanes, 512 * 4,
-                        kernel_size=1, stride=stride, bias=False),
-            BatchNorm(512 * 4),
-        )
-
-    layers = []
-    layers.append(
-        BottleNeck(self.inplanes, 512, stride, dilation=blocks[0]*dilation, downsample=downsample, BatchNorm=BatchNorm)
-    )
-    self.inplanes = 512 * 4
-    for i in range(1, len(blocks)):
-        layers.append(
-            BottleNeck(self.inplanes, 512, stride=1, dilation=blocks[i]*dilation, BatchNorm=BatchNorm)
-        )
-
-_make_MG_unit(BottleNeck, 512, blocks=blocks, stride=1, dilation=2, BatchNorm=BatchNorm)
-
-from torchvision.models.segmentation import deeplabv3_resnet101, deeplabv3_resnet50
-deeplabv3_resnet50().backbone.layer4
 
 
-class ResNet50Backbone(nn.Module):
-    def __init__(self):
+class ResNet101Backbone(nn.Module):
+    def __init__(self, output_stride, multi_grid=(1, 2, 4)):
         super().__init__()
 
-        self.conv1_pool1 = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
-        )
-        self.block1 = ResNetBlock(in_channels=64, out_channels=64, stride=2, dilation=1, n_blocks=3)
-        self.block2 = ResNetBlock(in_channels=256, out_channels=128, stride=2, dilation=1, n_blocks=4)
-        self.block3 = ResNetBlock(in_channels=512, out_channels=256, stride=1, dilation=1, n_blocks=6)
-        self.block4 = ResNetBlock(in_channels=1024, out_channels=512, stride=1, dilation=1, n_blocks=3)
+        self.conv1 = RESNET101.conv1
+        self.bn1 = RESNET101.bn1
+        self.maxpool = RESNET101.maxpool
+        self.block1 = RESNET101.layer1
+        self.block2 = RESNET101.layer2
+
+        if output_stride == 16:
+            self.block3 = RESNET101.layer3
+            self.block4 = MultiGridResNetBlock(
+                in_channels=1024, out_channels=512, stride=1, rate=2, multi_grid=multi_grid,
+            )
+        elif output_stride == 8:
+            # "When output `output_stride = 8`, the last two blocks ('block3' and 'block4')
+            # in the original ResNet contains atrous convolution with `rate = 2` and `rate = 4` respectively."
+            self.block3 = ResNetBlock(in_channels=512, out_channels=256, stride=1, dilation=2, n_blocks=23)
+            self.block4 = MultiGridResNetBlock(
+                in_channels=1024, out_channels=512, stride=1, rate=4, multi_grid=multi_grid,
+            )
 
     def forward(self, x):
-        x = self.conv1_pool1(x) # `(b, 64, h // 4, w // 4)`
-        x = self.block1(x) # `(b, 256, h // 8, w // 8)`
-        x = self.block2(x) # `(b, 512, h // 16, w // 16)`
-        x = self.block3(x) # `(b, 1024, h // 16, w // 16)`
-        x = self.block4(x) # `(b, 2048, h // 16, w // 16)`, "$rate = 2$"
+        x = self.conv1(x) # "'Conv1 + Pool1'"
+        x = self.bn1(x)
+        x = torch.relu(x)
+        x = self.maxpool(x)
+
+        x = self.block1(x) # "'Block1'"
+        x = self.block2(x) # "'Block2'"
+        x = self.block3(x) # "'Block3'"
+        x = self.block4(x) # "'Block4'"
         return x
 
 
@@ -214,8 +203,6 @@ class ASPP(nn.Module):
     def __init__(self, atrous_rates):
         super().__init__()
 
-        self.atrous_rates = atrous_rates
-
         # "ASPP consists of (a) one 1×1 convolution and three 3×3 convolutions
         # with `rates = (6, 12, 18)` when `output_stride = 16`, and (b) the image-level features.
         # "Four parallel atrous convolutions with different atrous rates are applied on top of the feature map."
@@ -237,27 +224,18 @@ class ASPP(nn.Module):
         return x
 
 
-class DeepLabv3(nn.Module):
+class DeepLabv3ResNet101(nn.Module):
     def __init__(self, output_stride=16, n_classes=21):
         super().__init__()
-
-        self.n_classes = n_classes
-
-        self.multi_grid = (1, 2, 4)
 
         # "we apply atrous convolution with rates determined by the desired output stride value."
         # Note that the rates are doubled when `output_stride = 8`.
         if output_stride == 16:
             self.atrous_rates = (6, 12, 18)
         elif output_stride == 8:
-            self.atrous_rates = (6, 12, 18)
-            # "When output `output_stride = 8`, the last two blocks ('block3' and 'block4')
-            # in the original ResNet contains atrous convolution with `rate = 2` and `rate = 4` respectively."
+            self.atrous_rates = (12, 24, 36)
 
-        # "There are three 3×3 convolutions in those blocks."
-        # "The last convolution contains stride $2$ except the one in last block."
-        self.backbone = ResNet50Backbone()
-        
+        self.backbone = ResNet101Backbone(output_stride=output_stride)
         self.aspp = ASPP(atrous_rates=self.atrous_rates)
         # "Pass through another 1×1 convolution (also with 256 filters and batch normalization)
         # before the final 1×1 convolution which generates the final logits."
@@ -267,17 +245,18 @@ class DeepLabv3(nn.Module):
     def forward(self, x):
         _, _, h, w = x.shape
 
-        x = self.backbone(x) # `(b, 2048, h // 16, w // 16)`
-        x = self.aspp(x) # `(b, 1280, h // 16, w // 16)`
-        x = self.conv_block(x) # `(b, 256, h // 16, w // 16)`
-        x = self.fin_conv(x) # `(b, n_classes, h // 16, w // 16)`
+        x = self.backbone(x)
+        x = self.aspp(x)
+        x = self.conv_block(x)
+        x = self.fin_conv(x)
 
         x = F.interpolate(x, size=(h, w))
         return x
 
 
 if __name__ == "__main__":
-    deeplabv3 = DeepLabv3()
     x = torch.randn(2, 3, 224, 224)
+    # deeplabv3 = DeepLabv3ResNet101(output_stride=16)
+    deeplabv3 = DeepLabv3ResNet101(output_stride=8)
     out = deeplabv3(x)
     print(out.shape)
