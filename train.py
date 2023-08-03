@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
 from torch.optim import SGD
@@ -45,7 +46,9 @@ WEIGHT_DECAY = 0.0005
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
+model = nn.DataParallel(model, output_device=0)
 optim = SGD(params=model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
 train_dl = DataLoader(
@@ -78,11 +81,15 @@ for step in range(1, N_STEPS + 1):
 
     optim.zero_grad()
 
-    pred = model(image)
+    with torch.autocast(device_type=DEVICE.type, dtype=torch.float16):
+        pred = model(image)
     
     loss = crit(pred=pred, gt=gt)
-    loss.backward()
-    optim.step()
+    scaler.scale(loss).backward()
+    scaler.step(optim)
+    scaler.update()
+    # loss.backward()
+    # optim.step()
 
     running_loss += loss.item()
 
