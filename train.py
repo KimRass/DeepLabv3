@@ -97,6 +97,8 @@ for step in range(1, N_STEPS + 1):
         running_loss /= 100
         print(f"""[ {step}/{N_STEPS} ][ {lr:4f} ] Loss: {running_loss:.4f}""")
 
+        running_loss = 0
+
     ### Evaluate.
     if step % 1000 == 0:
         model.eval()
