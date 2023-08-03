@@ -104,6 +104,9 @@ for step in range(1, N_STEPS + 1):
         model.eval()
         with torch.no_grad():
             for image, gt in val_dl:
+                image = image.to(DEVICE)
+                gt = gt.to(DEVICE)
+
                 pred = model(image)
                 miou = metric(pred=pred, gt=gt)
                 print(f"""[ {step}/{N_STEPS} ][ {lr} ] mIoU: {miou:.4f}""")
