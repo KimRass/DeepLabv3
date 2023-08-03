@@ -95,7 +95,7 @@ for step in range(1, N_STEPS + 1):
 
     if step % 100 == 0:
         running_loss /= 100
-        print(f"""[ {step}/{N_STEPS} ][ {lr} ] Loss: {running_loss:.4f}""")
+        print(f"""[ {step}/{N_STEPS} ][ {lr:4f} ] Loss: {running_loss:.4f}""")
 
     ### Evaluate.
     if step % 1000 == 0:
