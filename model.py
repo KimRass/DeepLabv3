@@ -250,7 +250,7 @@ class DeepLabv3ResNet101(nn.Module):
         x = self.conv_block(x)
         x = self.fin_conv(x)
 
-        x = F.interpolate(x, size=(h, w))
+        x = F.interpolate(x, size=(w, h), mode="bilinear", align_corners=False)
         return x
 
 
