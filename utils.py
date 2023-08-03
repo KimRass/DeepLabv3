@@ -22,3 +22,13 @@ def get_image_dataset_mean_and_std(data_dir, ext="jpg"):
     mean = torch.round(sum_rgb / sum_resol, decimals=3)
     std = torch.round((sum_rgb_square / sum_resol - mean ** 2) ** 0.5, decimals=3)
     return mean, std
+
+
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print(f"""Using {torch.cuda.device_count()} GPU(s).""")
+    else:
+        device = torch.device("cpu")
+        print("Using CPU.")
+    return device

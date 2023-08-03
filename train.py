@@ -10,6 +10,7 @@ from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelmIoU
+from utils import get_device
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed
 # when setting the CRF parameters."
@@ -42,7 +43,8 @@ LR = 0.0007
 # MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0005
 
-model = DeepLabv3ResNet101(output_stride=16)
+DEVICE = get_device()
+model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 optim = SGD(params=model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
@@ -68,6 +70,8 @@ for step in range(1, N_STEPS + 1):
     except StopIteration:
         train_di = iter(train_dl)
         image, gt = next(train_di)
+    image = image.to(DEVICE)
+    gt = gt.to(DEVICE)
 
     lr = get_lr(step=step, n_steps=N_STEPS)
     optim.param_groups[0]["lr"] = lr
