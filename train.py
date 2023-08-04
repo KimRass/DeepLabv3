@@ -48,10 +48,9 @@ ROOT_DIR = Path(__file__).parent
 # employ `output_stride = 8`, and train on the official PASCAL VOC 2012 trainval set
 # for another 30K iterations and smaller $base learning rate = 0.001$."
 IMG_SIZE = 513
-N_EPOCHS = 50
 BATCH_SIZE = 16
-# N_WORKERS = 4
-N_WORKERS = 0
+N_WORKERS = 4
+# N_WORKERS = 0
 # IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
 # GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
@@ -80,8 +79,8 @@ metric = PixelmIoU()
 
 ### Train.
 N_STEPS = 300_000
-N_PRINT_STEPS = 100
-N_EVAL_STEPS = 1000
+N_PRINT_STEPS = 500
+N_EVAL_STEPS = 3000
 running_loss = 0
 start_time = time()
 for step in range(1, N_STEPS + 1):
