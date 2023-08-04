@@ -88,8 +88,6 @@ for step in range(1, N_STEPS + 1):
     scaler.scale(loss).backward()
     scaler.step(optim)
     scaler.update()
-    # loss.backward()
-    # optim.step()
 
     running_loss += loss.item()
 
