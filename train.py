@@ -5,13 +5,13 @@ from torch.utils.data import DataLoader, random_split
 from torch.optim import SGD
 from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
-import random
+from time import time
 
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelmIoU
-from utils import get_device
+from utils import get_device, get_elapsed_time
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed
 # when setting the CRF parameters."
@@ -37,8 +37,7 @@ def evaluate(val_dl, model, metric):
 
             sum_miou += miou
         avg_miou = sum_miou / batch
-    print(f"""[ {step}/{N_STEPS} ][ {lr} ][ Average mIoU: {avg_miou:.4f} ]""")
-
+    return avg_miou
 
 
 ROOT_DIR = Path(__file__).parent
@@ -81,7 +80,10 @@ metric = PixelmIoU()
 
 ### Train.
 N_STEPS = 300_000
+N_PRINT_STEPS = 100
+N_EVAL_STEPS = 1000
 running_loss = 0
+start_time = time()
 for step in range(1, N_STEPS + 1):
     model.train()
 
@@ -108,12 +110,17 @@ for step in range(1, N_STEPS + 1):
 
     running_loss += loss.item()
 
-    if step % 100 == 0:
-        running_loss /= 100
-        print(f"""[ {step}/{N_STEPS} ][ {lr:4f} ] Loss: {running_loss:.4f}""")
+    if step % N_PRINT_STEPS == 0:
+        running_loss /= N_PRINT_STEPS
+        print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
+        print(f"""[ Loss: {running_loss:.4f} ]""")
+        start_time = time()
 
         running_loss = 0
 
     ### Evaluate.
-    if step % 1000 == 0:
-        evaluate(val_dl=val_dl, model=model, metric=metric)
+    if step % N_EVAL_STEPS == 0:
+        start_time = time()
+        avg_miou = evaluate(val_dl=val_dl, model=model, metric=metric)
+        print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
+        print(f"""[ Average mIoU: {avg_miou:.4f} ]""")

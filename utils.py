@@ -3,6 +3,8 @@ from pathlib import Path
 from tqdm.auto import tqdm
 import torch
 import torchvision.transforms as T
+from time import time
+from datetime import timedelta
 
 
 def get_image_dataset_mean_and_std(data_dir, ext="jpg"):
@@ -32,3 +34,6 @@ def get_device():
         device = torch.device("cpu")
         print("Using CPU.")
     return device
+
+def get_elapsed_time(start_time):
+    return timedelta(seconds=round(time() - start_time))
