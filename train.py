@@ -24,6 +24,23 @@ def get_lr(step, n_steps, power=0.9):
     return lr
 
 
+def evaluate(val_dl, model, metric):
+    model.eval()
+    with torch.no_grad():
+        sum_miou = 0
+        for batch, (image, gt) in enumerate(val_dl, start=1):
+            image = image.to(DEVICE)
+            gt = gt.to(DEVICE)
+
+            pred = model(image)
+            miou = metric(pred=pred, gt=gt)
+
+            sum_miou += miou
+        avg_miou = sum_miou / batch
+    print(f"""[ {step}/{N_STEPS} ][ {lr} ][ Average mIoU: {avg_miou:.4f} ]""")
+
+
+
 ROOT_DIR = Path(__file__).parent
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16. The batch normalization parameters
@@ -99,12 +116,4 @@ for step in range(1, N_STEPS + 1):
 
     ### Evaluate.
     if step % 1000 == 0:
-        model.eval()
-        with torch.no_grad():
-            for image, gt in val_dl:
-                image = image.to(DEVICE)
-                gt = gt.to(DEVICE)
-
-                pred = model(image)
-                miou = metric(pred=pred, gt=gt)
-                print(f"""[ {step}/{N_STEPS} ][ {lr} ] mIoU: {miou:.4f}""")
+        evaluate(val_dl=val_dl, model=model, metric=metric)
