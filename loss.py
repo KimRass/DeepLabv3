@@ -9,9 +9,9 @@ class DeepLabLoss(nn.Module):
     def __init__(self):
         super().__init__()
 
-        # "Our loss function is the sum of cross-entropy terms for each spatial position in the CNN output map
-        # (subsampled by 8 compared to the original image). All positions and gts are equally weighted
-        # in the overall loss function. Our targets are the ground truth gts (subsampled by 8)."
+        # "Our loss function is the sum of cross-entropy terms for each spatial position in the CNN output map.
+        # All positions and labels are equally weighted in the overall loss function.
+        # Our targets are the ground truth labels."
         self.ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
 
     def forward(self, pred, gt):

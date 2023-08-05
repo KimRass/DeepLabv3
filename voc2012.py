@@ -85,14 +85,12 @@ class VOC2012Dataset(Dataset):
 if __name__ == "__main__":
     img_dir = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
     gt_dir = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
-    train_ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="val")
-    image, gt = train_ds[30]
-    gt.unique()
-    # image.shape, gt.shape
+    train_ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="train")
+    image, gt = train_ds[random.choice(range(100))]
+    image.shape, gt.shape
 
-
-    # gt = TF.pil_to_tensor(gt).long()
-    # gt[gt == 255] = 0
-    # gt = (gt.numpy() * 10 + 55).astype("uint8")[0]
-    # gt = Image.fromarray(gt)
-    # image.show(), gt.show()
+    gt = TF.pil_to_tensor(gt).long()
+    gt[gt == 255] = 0
+    gt = (gt.numpy() * 10 + 55).astype("uint8")[0]
+    gt = Image.fromarray(gt)
+    image.show(), gt.show()

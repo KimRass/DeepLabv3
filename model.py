@@ -257,7 +257,7 @@ class DeepLabv3ResNet101(nn.Module):
 
 if __name__ == "__main__":
     x = torch.randn(2, 3, 513, 513)
-    deeplabv3 = DeepLabv3ResNet101(output_stride=16)
-    # deeplabv3 = DeepLabv3ResNet101(output_stride=8)
-    pred = deeplabv3(x)
+    model = DeepLabv3ResNet101(output_stride=16)
+    # model = DeepLabv3ResNet101(output_stride=8)
+    pred = model(x)
     print(pred.shape)

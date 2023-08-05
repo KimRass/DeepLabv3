@@ -14,7 +14,7 @@ from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelmIoU
-from utils import get_device, get_elapsed_time
+from utils import get_device, get_elapsed_time, save_checkpoint
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed
 # when setting the CRF parameters."
@@ -28,7 +28,6 @@ def get_lr(init_lr, step, n_steps, power=0.9):
 
 
 def evaluate(val_dl, model, metric):
-    model.eval()
     with torch.no_grad():
         sum_miou = 0
         for batch, (image, gt) in enumerate(val_dl, start=1):
@@ -43,7 +42,6 @@ def evaluate(val_dl, model, metric):
     return avg_miou
 
 
-ROOT_DIR = Path(__file__).parent
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16. The batch normalization parameters
 # are trained with $decay = 0.9997$. After training on the 'trainaug' set with 30K iterations
@@ -75,14 +73,16 @@ train_dl = DataLoader(
 train_di = iter(train_dl)
 
 val_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="val")
-val_dl = DataLoader(val_ds, batch_size=1, shuffle=True, num_workers=N_WORKERS)
+val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=N_WORKERS)
 
 crit = DeepLabLoss()
 metric = PixelmIoU()
 
 ### Train.
-N_STEPS = 300_000
+# N_STEPS = 300_000 # In the paper
+N_STEPS = 600_000 # In my case
 N_PRINT_STEPS = 500
+N_CKPT_STEPS = 5000
 N_EVAL_STEPS = 3000
 running_loss = 0
 start_time = time()
@@ -116,13 +116,24 @@ for step in range(1, N_STEPS + 1):
         running_loss /= N_PRINT_STEPS
         print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Loss: {running_loss:.4f} ]""")
+        running_loss = 0
+
         start_time = time()
 
-        running_loss = 0
+    if step % N_CKPT_STEPS == 0:
+        save_checkpoint(
+            step=step,
+            n_steps=N_STEPS,
+            model=model,
+            optim=optim,
+            save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
+        )
 
     ### Evaluate.
     if step % N_EVAL_STEPS == 0:
         start_time = time()
+
+        model.eval()
         avg_miou = evaluate(val_dl=val_dl, model=model, metric=metric)
         print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Average mIoU: {avg_miou:.4f} ]""")

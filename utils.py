@@ -38,8 +38,21 @@ def get_device():
         print("Using CPU.")
     return device
 
+
 def get_elapsed_time(start_time):
     return timedelta(seconds=round(time() - start_time))
+
+
+def save_checkpoint(step, n_steps, model, optim, save_path):
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
+    ckpt = {
+        "step": step,
+        "number_of_steps": n_steps,
+        "model": model.state_dict(),
+        "optimizer": optim.state_dict(),
+    }
+    torch.save(ckpt, str(save_path))
 
 
 # def label_img_to_color(img):
