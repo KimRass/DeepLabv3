@@ -10,7 +10,8 @@ from torchvision.models import resnet101, ResNet101_Weights
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
+# RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
+RESNET101 = resnet101()
 
 
 class Bottleneck(nn.Module):

@@ -12,8 +12,7 @@ class DeepLabLoss(nn.Module):
         # "Our loss function is the sum of cross-entropy terms for each spatial position in the CNN output map.
         # All positions and labels are equally weighted in the overall loss function.
         # Our targets are the ground truth labels."
-        # self.ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
-        self.ce = nn.CrossEntropyLoss(ignore_index=255, reduction="sum")
+        self.ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
 
     def forward(self, pred, gt):
         pred = rearrange(pred, pattern="b c h w -> (b h w) c")
@@ -23,7 +22,11 @@ class DeepLabLoss(nn.Module):
 
 
 if __name__ == "__main__":
-    ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
+    crit = DeepLabLoss()
+    gt = gt[None, ...]
+    pred = torch.randn(1, 21, 513, 513)
+    crit(pred=pred, gt=gt)
+    
     image, gt = next(iter(train_dl))
     pred.shape, gt.shape
     pred = rearrange(pred, pattern="b c h w -> (b h w) c")
