@@ -7,31 +7,6 @@ import random
 
 from utils import get_image_dataset_mean_and_std
 
-
-VOC_CLASSES = [
-    "background",
-    "aeroplane",
-    "bicycle",
-    "bird",
-    "boat",
-    "bottle",
-    "bus",
-    "car",
-    "cat",
-    "chair",
-    "cow",
-    "diningtable",
-    "dog",
-    "horse",
-    "motorbike",
-    "person",
-    "pottedplant",
-    "sheep",
-    "sofa",
-    "train",
-    "tvmonitor"
-]
-
 IMG_SIZE = 513
 
 
@@ -82,10 +57,8 @@ class VOC2012Dataset(Dataset):
         elif self.split == "val":
             w, h = gt.size
             padding = (max(0, IMG_SIZE - w), max(0, IMG_SIZE - h))
-            # gt = TF.pad(gt, padding=padding, padding_mode="constant")
             gt = TF.center_crop(gt, output_size=IMG_SIZE)
 
-            # image = TF.pad(image, padding=padding, padding_mode="constant")
             image = TF.center_crop(image, output_size=IMG_SIZE)
         return image, gt
 
@@ -99,8 +72,8 @@ class VOC2012Dataset(Dataset):
         img_path = f"""{self.img_dir/gt_path.stem}.jpg"""
         image = Image.open(img_path).convert("RGB")
 
-        # if self.split == "train":
         image, gt = self._transform(image=image, gt=gt)
+
         image = TF.to_tensor(image)
         # `get_image_dataset_mean_and_std()`
         image = TF.normalize(image, mean=(0.452, 0.431, 0.399), std=(0.277, 0.273, 0.285))
@@ -112,7 +85,14 @@ class VOC2012Dataset(Dataset):
 if __name__ == "__main__":
     img_dir = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
     gt_dir = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
-    idx = 3
-    ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="val")
-    image, gt = ds[32]
-    image.shape
+    train_ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="val")
+    image, gt = train_ds[30]
+    gt.unique()
+    # image.shape, gt.shape
+
+
+    # gt = TF.pil_to_tensor(gt).long()
+    # gt[gt == 255] = 0
+    # gt = (gt.numpy() * 10 + 55).astype("uint8")[0]
+    # gt = Image.fromarray(gt)
+    # image.show(), gt.show()

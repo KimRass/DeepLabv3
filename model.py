@@ -1,5 +1,6 @@
 # References:
     # https://github.com/PengtaoJiang/OAA-PyTorch/blob/master/deeplab-pytorch/libs/models/deeplabv3.py
+    # https://gaussian37.github.io/vision-segmentation-deeplabv3/
 
 import torch
 import torch.nn as nn
@@ -255,8 +256,8 @@ class DeepLabv3ResNet101(nn.Module):
 
 
 if __name__ == "__main__":
-    x = torch.randn(2, 3, 224, 224)
-    # deeplabv3 = DeepLabv3ResNet101(output_stride=16)
-    deeplabv3 = DeepLabv3ResNet101(output_stride=8)
-    out = deeplabv3(x)
-    print(out.shape)
+    x = torch.randn(2, 3, 513, 513)
+    deeplabv3 = DeepLabv3ResNet101(output_stride=16)
+    # deeplabv3 = DeepLabv3ResNet101(output_stride=8)
+    pred = deeplabv3(x)
+    print(pred.shape)

@@ -1,3 +1,6 @@
+# References:
+    # https://github.com/PengtaoJiang/OAA-PyTorch/blob/master/deeplab-pytorch/libs/utils/lr_scheduler.py
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,10 +20,10 @@ from utils import get_device, get_elapsed_time
 # when setting the CRF parameters."
 
 
-def get_lr(step, n_steps, power=0.9):
+def get_lr(init_lr, step, n_steps, power=0.9):
     # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
-    # by $1 - \frac{iter}{max_iter}^{power}$ with $power = 0.9$."
-    lr = 1 - (step / n_steps) ** power
+    # by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
+    lr = init_lr * (1 - (step / n_steps)) ** power
     return lr
 
 
@@ -50,19 +53,19 @@ ROOT_DIR = Path(__file__).parent
 IMG_SIZE = 513
 BATCH_SIZE = 16
 N_WORKERS = 4
-# N_WORKERS = 0
 # IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
 # GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
-LR = 0.0007
+INIT_LR = 0.007
 # MOMENTUM = 0.9
-WEIGHT_DECAY = 0.0005
+# WEIGHT_DECAY = 0.0005
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 model = nn.DataParallel(model, output_device=0)
-optim = SGD(params=model.parameters(), lr=LR, weight_decay=WEIGHT_DECAY)
+# optim = SGD(params=model.parameters(), lr=INIT_LR, weight_decay=WEIGHT_DECAY)
+optim = SGD(params=model.parameters(), lr=INIT_LR)
 scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
@@ -94,7 +97,7 @@ for step in range(1, N_STEPS + 1):
     image = image.to(DEVICE)
     gt = gt.to(DEVICE)
 
-    lr = get_lr(step=step, n_steps=N_STEPS)
+    lr = get_lr(init_lr=INIT_LR, step=step, n_steps=N_STEPS)
     optim.param_groups[0]["lr"] = lr
 
     optim.zero_grad()

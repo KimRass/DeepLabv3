@@ -1,6 +1,9 @@
-import torch.nn as nn
+# References:
+    # https://github.com/VainF/DeepLabV3Plus-Pytorch/blob/master/utils/loss.py
 
-N_CLASSES = 21
+import torch.nn as nn
+from einops import rearrange
+
 
 class DeepLabLoss(nn.Module):
     def __init__(self):
@@ -12,7 +15,17 @@ class DeepLabLoss(nn.Module):
         self.ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
 
     def forward(self, pred, gt):
-        pred = pred.permute(0, 2, 3, 1).reshape((-1, N_CLASSES))
-        gt = gt.permute(0, 2, 3, 1).view(-1)
+        pred = rearrange(pred, pattern="b c h w -> (b h w) c")
+        gt = rearrange(gt, pattern="b c h w -> (b h w) c").squeeze(1)
         loss = self.ce(pred, gt)
         return loss
+
+
+if __name__ == "__main__":
+    ce = nn.CrossEntropyLoss(ignore_index=255, reduction="mean")
+    image, gt = next(iter(train_dl))
+    pred.shape, gt.shape
+    pred = rearrange(pred, pattern="b c h w -> (b h w) c")
+    gt = rearrange(gt, pattern="b c h w -> (b h w) c").squeeze(1)
+
+    loss = ce(pred, gt)
