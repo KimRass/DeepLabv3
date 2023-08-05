@@ -128,6 +128,7 @@ for step in range(1, N_STEPS + 1):
             optim=optim,
             save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
         )
+        print(f"""Saved checkpoint at step {step}/{N_STEPS}.""")
 
     ### Evaluate.
     if step % N_EVAL_STEPS == 0:
