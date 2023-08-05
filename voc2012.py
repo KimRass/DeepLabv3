@@ -82,7 +82,9 @@ if __name__ == "__main__":
     train_ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="train")
     image, gt = train_ds[random.choice(range(100))]
     image.shape, gt.shape
+    
     img = pred[0].argmax(dim=0).numpy()
+    np.unique(img)
     temp = label_img_to_color(img)
     temp.show()
 

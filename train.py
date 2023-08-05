@@ -89,6 +89,8 @@ start_time = time()
 for step in range(1, N_STEPS + 1):
     model.train()
 
+    optim.zero_grad()
+
     try:
         image, gt = next(train_di)
     except StopIteration:
