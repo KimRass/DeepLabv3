@@ -68,8 +68,7 @@ scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
 train_dl = DataLoader(
-    # train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
-    train_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+    train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
 )
 train_di = iter(train_dl)
 
@@ -83,7 +82,7 @@ metric = PixelmIoU()
 # N_STEPS = 300_000 # In the paper
 N_STEPS = 600_000 # In my case
 N_PRINT_STEPS = 500
-N_CKPT_STEPS = 5000
+N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
 running_loss = 0
 start_time = time()
@@ -91,7 +90,6 @@ for step in range(1, N_STEPS + 1):
     model.train()
 
     try:
-        train_di = iter(train_dl)
         image, gt = next(train_di)
     except StopIteration:
         train_di = iter(train_dl)
@@ -122,15 +120,15 @@ for step in range(1, N_STEPS + 1):
 
         start_time = time()
 
-    # if step % N_CKPT_STEPS == 0:
-    #     save_checkpoint(
-    #         step=step,
-    #         n_steps=N_STEPS,
-    #         model=model,
-    #         optim=optim,
-    #         save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
-    #     )
-    #     print(f"""Saved checkpoint at step {step:,}/{N_STEPS:,}.""")
+    if step % N_CKPT_STEPS == 0:
+        save_checkpoint(
+            step=step,
+            n_steps=N_STEPS,
+            model=model,
+            optim=optim,
+            save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
+        )
+        print(f"""Saved checkpoint at step {step:,}/{N_STEPS:,}.""")
 
     ### Evaluate.
     if step % N_EVAL_STEPS == 0:
