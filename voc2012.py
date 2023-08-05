@@ -5,7 +5,7 @@ from PIL import Image
 from pathlib import Path
 import random
 
-from utils import get_image_dataset_mean_and_std
+from utils import get_val_filenames, get_voc2012_trainaug_mean_and_std
 
 IMG_SIZE = 513
 
@@ -18,20 +18,14 @@ class VOC2012Dataset(Dataset):
         self.split = split
 
         self.gts = list(Path(gt_dir).glob("*.png"))
-        filenames = self.get_val_filenames()
+        filenames = get_val_filenames(self.img_dir)
         if split == "train":
             self.gts = [i for i in self.gts if i.stem not in filenames]
         elif split == "val":
             self.gts = [i for i in self.gts if i.stem in filenames]
 
-    def get_val_filenames(self):
-        val_txt_path = Path(self.img_dir).parent/"ImageSets/Segmentation/val.txt"
-        with open(val_txt_path, mode="r") as f:
-            filenames = [l.strip() for l in f.readlines()]
-        return filenames
-
     def _transform(self, image, gt):
-        if self.split == "train":
+        if self.split == "train": # 10,582 images and labels
             # "Randomly left-right flipping"
             if random.random() > 0.5:
                 image = TF.hflip(image)
@@ -54,7 +48,7 @@ class VOC2012Dataset(Dataset):
             image = TF.pad(image, padding=padding, padding_mode="constant")
             image = TF.crop(image, top=t, left=l, height=h, width=w)
 
-        elif self.split == "val":
+        elif self.split == "val": # 1,449 images and labels
             w, h = gt.size
             padding = (max(0, IMG_SIZE - w), max(0, IMG_SIZE - h))
             gt = TF.center_crop(gt, output_size=IMG_SIZE)
@@ -75,8 +69,8 @@ class VOC2012Dataset(Dataset):
         image, gt = self._transform(image=image, gt=gt)
 
         image = TF.to_tensor(image)
-        # `get_image_dataset_mean_and_std()`
-        image = TF.normalize(image, mean=(0.452, 0.431, 0.399), std=(0.277, 0.273, 0.285))
+        # `get_voc2012_trainaug_mean_and_std`
+        image = TF.normalize(image, mean=(0.457, 0.437, 0.404), std=(0.275, 0.271, 0.284))
 
         gt = TF.pil_to_tensor(gt).long()
         return image, gt

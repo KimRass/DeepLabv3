@@ -9,6 +9,66 @@ import torchvision.transforms as T
 from time import time
 from datetime import timedelta
 
+IMG_SIZE = 513
+
+VOC_COLORMAP = [
+    [0, 0, 0],
+    [128, 0, 0],
+    [0, 128, 0],
+    [128, 128, 0],
+    [0, 0, 128],
+    [128, 0, 128],
+    [0, 128, 128],
+    [128, 128, 128],
+    [64, 0, 0],
+    [192, 0, 0],
+    [64, 128, 0],
+    [192, 128, 0],
+    [64, 0, 128],
+    [192, 0, 128],
+    [64, 128, 128],
+    [192, 128, 128],
+    [0, 64, 0],
+    [128, 64, 0],
+    [0, 192, 0],
+    [128, 192, 0],
+    [0, 64, 128],
+]
+
+def get_val_filenames(img_dir):
+    val_txt_path = Path(img_dir).parent/"ImageSets/Segmentation/val.txt"
+    with open(val_txt_path, mode="r") as f:
+        filenames = [l.strip() for l in f.readlines()]
+    return filenames
+
+
+def get_voc2012_trainaug_mean_and_std(img_dir, gt_dir):
+    img_dir = Path(img_dir)
+    gt_dir = Path(gt_dir)
+
+    val_filenames = get_val_filenames(img_dir)
+    cnt = 0
+    sum_rgb = 0
+    sum_rgb_square = 0
+    sum_resol = 0
+    for gt_path in tqdm(list(Path(gt_dir).glob("*.png"))):
+        if gt_path.stem in val_filenames:
+            continue
+        cnt += 1
+
+        img_path = (img_dir/gt_path.stem).with_suffix(".jpg")
+        pil_img = Image.open(img_path)
+        tensor = T.ToTensor()(pil_img)
+        
+        sum_rgb += tensor.sum(dim=(1, 2))
+        sum_rgb_square += (tensor ** 2).sum(dim=(1, 2))
+        _, h, w = tensor.shape
+        sum_resol += h * w
+    mean = torch.round(sum_rgb / sum_resol, decimals=3)
+    std = torch.round((sum_rgb_square / sum_resol - mean ** 2) ** 0.5, decimals=3)
+    print(f"""Total {cnt:,} images found.""")
+    return mean, std
+
 
 def get_image_dataset_mean_and_std(data_dir, ext="jpg"):
     data_dir = Path(data_dir)
@@ -55,42 +115,41 @@ def save_checkpoint(step, n_steps, model, optim, save_path):
     torch.save(ckpt, str(save_path))
 
 
-# def label_img_to_color(img):
-#     label_to_color = {
-#         0: [128, 64,128],
-#         1: [244, 35,232],
-#         2: [ 70, 70, 70],
-#         3: [102,102,156],
-#         4: [190,153,153],
-#         5: [153,153,153],
-#         6: [250,170, 30],
-#         7: [220,220,  0],
-#         8: [107,142, 35],
-#         9: [152,251,152],
-#         10: [ 70,130,180],
-#         11: [220, 20, 60],
-#         12: [255,  0,  0],
-#         13: [  0,  0,142],
-#         14: [  0,  0, 70],
-#         15: [  0, 60,100],
-#         16: [  0, 80,100],
-#         17: [  0,  0,230],
-#         18: [119, 11, 32],
-#         19: [81,  0, 81]
-#     }
-#     _, h, w = gt.shape
-#     canvas = torch.zeros(size=(3, h, w), dtype=torch.long)
-#     for label in gt.unique():
-#         canvas[(gt == label)]
-#         canvas[(gt == label)] = label_to_color[label]
+import numpy as np
+from skimage.io import imshow
+import matplotlib.pyplot as plt
 
-#     img_height, img_width = img.shape
+def color_map(N=256, normalized=False):
+    def bitget(byteval, idx):
+        return ((byteval & (1 << idx)) != 0)
 
-#     img_color = np.zeros((img_height, img_width, 3))
-#     for row in range(img_height):
-#         for col in range(img_width):
-#             label = img[row, col]
+    dtype = 'float32' if normalized else 'uint8'
+    cmap = np.zeros((N, 3), dtype=dtype)
+    for i in range(N):
+        r = g = b = 0
+        c = i
+        for j in range(8):
+            r = r | (bitget(c, 0) << 7-j)
+            g = g | (bitget(c, 1) << 7-j)
+            b = b | (bitget(c, 2) << 7-j)
+            c = c >> 3
 
-#             img_color[row, col] = np.array(label_to_color[label])
+        cmap[i] = np.array([r, g, b])
 
-#     return img_color
+    cmap = cmap/255 if normalized else cmap
+    return cmap
+
+
+def label_img_to_color(img):
+    """
+    Args:
+        img: `(h, w)` (uint8)
+    """
+    image = Image.fromarray(img.astype("uint8"), mode="P")
+    image.putpalette(sum(VOC_COLORMAP, []))
+    return image
+
+image, gt = next(iter(train_dl))
+gt = gt[0, 0, ...]
+image = label_img_to_color(gt.numpy())
+image.show()

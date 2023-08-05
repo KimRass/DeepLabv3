@@ -56,19 +56,20 @@ N_WORKERS = 4
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
 INIT_LR = 0.007
-# MOMENTUM = 0.9
-# WEIGHT_DECAY = 0.0005
+MOMENTUM = 0.9
+WEIGHT_DECAY = 0.0004
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 model = nn.DataParallel(model, output_device=0)
-# optim = SGD(params=model.parameters(), lr=INIT_LR, weight_decay=WEIGHT_DECAY)
-optim = SGD(params=model.parameters(), lr=INIT_LR)
+optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+# optim = SGD(params=model.parameters(), lr=INIT_LR)
 scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
 train_dl = DataLoader(
-    train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+    # train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+    train_ds, batch_size=BATCH_SIZE, shuffle=False, num_workers=N_WORKERS, pin_memory=True, drop_last=True
 )
 train_di = iter(train_dl)
 
@@ -90,6 +91,7 @@ for step in range(1, N_STEPS + 1):
     model.train()
 
     try:
+        train_di = iter(train_dl)
         image, gt = next(train_di)
     except StopIteration:
         train_di = iter(train_dl)
@@ -120,15 +122,15 @@ for step in range(1, N_STEPS + 1):
 
         start_time = time()
 
-    if step % N_CKPT_STEPS == 0:
-        save_checkpoint(
-            step=step,
-            n_steps=N_STEPS,
-            model=model,
-            optim=optim,
-            save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
-        )
-        print(f"""Saved checkpoint at step {step}/{N_STEPS}.""")
+    # if step % N_CKPT_STEPS == 0:
+    #     save_checkpoint(
+    #         step=step,
+    #         n_steps=N_STEPS,
+    #         model=model,
+    #         optim=optim,
+    #         save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
+    #     )
+    #     print(f"""Saved checkpoint at step {step:,}/{N_STEPS:,}.""")
 
     ### Evaluate.
     if step % N_EVAL_STEPS == 0:
