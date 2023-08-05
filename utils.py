@@ -149,7 +149,7 @@ def label_img_to_color(img):
     image.putpalette(sum(VOC_COLORMAP, []))
     return image
 
-image, gt = next(iter(train_dl))
-gt = gt[0, 0, ...]
-image = label_img_to_color(gt.numpy())
-image.show()
+# image, gt = next(iter(train_dl))
+# gt = gt[0, 0, ...]
+# image = label_img_to_color(gt.numpy())
+# image.show()
