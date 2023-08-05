@@ -70,6 +70,7 @@ train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
 train_dl = DataLoader(
     train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
 )
+train_di = iter(train_dl)
 
 val_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="val")
 val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=N_WORKERS)
