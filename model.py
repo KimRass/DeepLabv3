@@ -8,10 +8,12 @@ import torch.nn.functional as F
 import ssl
 from torchvision.models import resnet101, ResNet101_Weights
 
+torch.set_printoptions(precision=4, edgeitems=12, linewidth=300)
+
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
-RESNET101 = resnet101()
+RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
+# RESNET101 = resnet101()
 
 
 class Bottleneck(nn.Module):
@@ -252,7 +254,7 @@ class DeepLabv3ResNet101(nn.Module):
         x = self.conv_block(x)
         x = self.fin_conv(x)
 
-        x = F.interpolate(x, size=(w, h), mode="bilinear", align_corners=False)
+        x = F.interpolate(x, size=(w, h), mode="bilinear", align_corners=True)
         return x
 
 
@@ -261,4 +263,7 @@ if __name__ == "__main__":
     model = DeepLabv3ResNet101(output_stride=16)
     # model = DeepLabv3ResNet101(output_stride=8)
     pred = model(x)
+    pred[0, 0, : 2, : 2]
+    x = F.interpolate(pred, size=(513, 513), mode="bilinear", align_corners=True)
+    x[0, 0, : 32, : 32]
     print(pred.shape)

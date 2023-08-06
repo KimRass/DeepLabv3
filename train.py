@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
-from torch.optim import SGD
+from torch.optim import SGD, Adam
 from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
 from time import time
@@ -61,9 +61,9 @@ WEIGHT_DECAY = 0.0004
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
-model = nn.DataParallel(model, output_device=0)
-optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
-# optim = SGD(params=model.parameters(), lr=INIT_LR)
+# model = nn.DataParallel(model, output_device=0)
+# optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
 scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
@@ -89,8 +89,6 @@ start_time = time()
 for step in range(1, N_STEPS + 1):
     model.train()
 
-    optim.zero_grad()
-
     try:
         image, gt = next(train_di)
     except StopIteration:
@@ -102,11 +100,10 @@ for step in range(1, N_STEPS + 1):
     lr = get_lr(init_lr=INIT_LR, step=step, n_steps=N_STEPS)
     optim.param_groups[0]["lr"] = lr
 
-    optim.zero_grad()
-
     with torch.autocast(device_type=DEVICE.type, dtype=torch.float16):
         pred = model(image)
-    
+
+    optim.zero_grad()
     loss = crit(pred=pred, gt=gt)
     scaler.scale(loss).backward()
     scaler.step(optim)
