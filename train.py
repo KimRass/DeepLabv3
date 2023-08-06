@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
 from torch.optim import SGD, Adam
-from torch.cuda.amp.grad_scaler import GradScaler
+# from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
 from time import time
 
@@ -55,8 +55,8 @@ N_WORKERS = 4
 # GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
-# INIT_LR = 0.007
-INIT_LR = 0.07
+INIT_LR = 0.007
+# INIT_LR = 0.07
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
 
@@ -65,7 +65,7 @@ model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 model = nn.DataParallel(model, output_device=0)
 optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 # optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
-scaler = GradScaler()
+# scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
 train_dl = DataLoader(

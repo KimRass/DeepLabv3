@@ -13,7 +13,6 @@ torch.set_printoptions(precision=4, edgeitems=12, linewidth=300)
 ssl._create_default_https_context = ssl._create_unverified_context
 
 RESNET101 = resnet101(weights=ResNet101_Weights.DEFAULT)
-# RESNET101 = resnet101()
 
 
 class Bottleneck(nn.Module):
