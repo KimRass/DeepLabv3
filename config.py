@@ -1,7 +1,6 @@
 ### Data
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
-N_WORKERS = 4
 VOC_CLASSES = [
     "background",
     "aeroplane",
@@ -59,6 +58,8 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
 
 ## Training
+BATCH_SIZE = 16
+N_WORKERS = 4
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
 N_CKPT_STEPS = 6000
