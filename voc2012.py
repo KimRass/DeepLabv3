@@ -5,7 +5,11 @@ from PIL import Image
 from pathlib import Path
 import random
 
-from utils import get_val_filenames, get_voc2012_trainaug_mean_and_std
+from utils import (
+    get_val_filenames,
+    get_voc2012_trainaug_mean_and_std,
+    visualize_batched_image_and_gt,
+)
 
 IMG_SIZE = 513
 
@@ -80,16 +84,12 @@ if __name__ == "__main__":
     img_dir = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
     gt_dir = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
     train_ds = VOC2012Dataset(img_dir=img_dir, gt_dir=gt_dir, split="train")
-    image, gt = train_ds[random.choice(range(100))]
-    image.shape, gt.shape
-    
-    img = pred[0].argmax(dim=0).numpy()
-    np.unique(img)
-    temp = label_img_to_color(img)
-    temp.show()
-
-    gt = TF.pil_to_tensor(gt).long()
-    gt[gt == 255] = 0
-    gt = (gt.numpy() * 10 + 55).astype("uint8")[0]
-    gt = Image.fromarray(gt)
-    image.show(), gt.show()
+    train_dl = DataLoader(
+        train_ds, batch_size=16, shuffle=True, num_workers=0, pin_memory=True, drop_last=True
+    )
+    cnt = 0
+    for _ in range(10):
+        image, gt = next(iter(train_dl))
+        vis = visualize_batched_image_and_gt(image, gt, n_cols=4, alpha=0.7)
+        vis.save(f"""/Users/jongbeomkim/Desktop/workspace/deeplabv3_from_scratch/input_images/{cnt}.jpg""")
+        cnt += 1

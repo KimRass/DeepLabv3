@@ -23,13 +23,7 @@ class DeepLabLoss(nn.Module):
 
 if __name__ == "__main__":
     crit = DeepLabLoss()
-    gt = gt[None, ...]
-    pred = torch.randn(1, 21, 513, 513)
-    crit(pred=pred, gt=gt)
-    
-    image, gt = next(iter(train_dl))
+    # gt = gt[None, ...]
+    pred = torch.randn(16, 21, 513, 513)
     pred.shape, gt.shape
-    pred = rearrange(pred, pattern="b c h w -> (b h w) c")
-    gt = rearrange(gt, pattern="b c h w -> (b h w) c").squeeze(1)
-
-    loss = ce(pred, gt)
+    crit(pred=pred, gt=gt)

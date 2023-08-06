@@ -27,7 +27,7 @@ def get_lr(init_lr, step, n_steps, power=0.9):
     return lr
 
 
-def evaluate(val_dl, model, metric):
+def validate(val_dl, model, metric):
     with torch.no_grad():
         sum_miou = 0
         for batch, (image, gt) in enumerate(val_dl, start=1):
@@ -55,15 +55,16 @@ N_WORKERS = 4
 # GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
-INIT_LR = 0.007
+# INIT_LR = 0.007
+INIT_LR = 0.07
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 # model = nn.DataParallel(model, output_device=0)
-# optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
-optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
+optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
+# optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
 scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
@@ -129,11 +130,11 @@ for step in range(1, N_STEPS + 1):
         )
         print(f"""Saved checkpoint at step {step:,}/{N_STEPS:,}.""")
 
-    ### Evaluate.
+    ### Validate.
     if step % N_EVAL_STEPS == 0:
         start_time = time()
 
         model.eval()
-        avg_miou = evaluate(val_dl=val_dl, model=model, metric=metric)
+        avg_miou = validate(val_dl=val_dl, model=model, metric=metric)
         print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Average mIoU: {avg_miou:.4f} ]""")

@@ -6,33 +6,36 @@ from pathlib import Path
 from tqdm.auto import tqdm
 import torch
 import torchvision.transforms as T
+import torchvision.transforms.functional as TF
+from torchvision.utils import make_grid
 from time import time
 from datetime import timedelta
 
 IMG_SIZE = 513
 
 VOC_COLORMAP = [
-    [0, 0, 0],
-    [128, 0, 0],
-    [0, 128, 0],
-    [128, 128, 0],
-    [0, 0, 128],
-    [128, 0, 128],
-    [0, 128, 128],
-    [128, 128, 128],
-    [64, 0, 0],
-    [192, 0, 0],
-    [64, 128, 0],
-    [192, 128, 0],
-    [64, 0, 128],
-    [192, 0, 128],
-    [64, 128, 128],
-    [192, 128, 128],
-    [0, 64, 0],
-    [128, 64, 0],
-    [0, 192, 0],
-    [128, 192, 0],
-    [0, 64, 128],
+    (0, 0, 0),
+    (128, 0, 0),
+    (0, 128, 0),
+    (128, 128, 0),
+    (0, 0, 128),
+    (128, 0, 128),
+    (0, 128, 128),
+    (128, 128, 128),
+    (64, 0, 0),
+    (192, 0, 0),
+    (64, 128, 0),
+    (192, 128, 0),
+    (64, 0, 128),
+    (192, 0, 128),
+    (64, 128, 128),
+    (192, 128, 128),
+    (0, 64, 0),
+    (128, 64, 0),
+    (0, 192, 0),
+    (128, 192, 0),
+    (0, 64, 128),
+    (255, 255, 255),
 ]
 
 def get_val_filenames(img_dir):
@@ -115,16 +118,34 @@ def save_checkpoint(step, n_steps, model, optim, save_path):
     torch.save(ckpt, str(save_path))
 
 
-def label_img_to_color(img):
+# def label_img_to_color(img):
+#     """
+#     Args:
+#         img: `(h, w)` (uint8)
+#     """
+#     image = Image.fromarray(img.astype("uint8"), mode="P")
+#     image.putpalette(sum(VOC_COLORMAP, []))
+#     return image
+
+
+def visualize_batched_image(image, n_cols):
+    grid = make_grid(image, nrow=n_cols, normalize=True, pad_value=1)
+    grid = TF.to_pil_image(grid)
+    return grid
+
+
+def visualize_batched_gt(gt, n_cols):
     """
     Args:
-        img: `(h, w)` (uint8)
+        gt: `(b, 1, h, w)` (dtype: `torch.long()`)
     """
-    image = Image.fromarray(img.astype("uint8"), mode="P")
-    image.putpalette(sum(VOC_COLORMAP, []))
-    return image
+    grid = make_grid(gt, nrow=n_cols, pad_value=21)
+    grid = Image.fromarray(grid[0].numpy().astype("uint8"), mode="P")
+    grid.putpalette(sum(VOC_COLORMAP, ()))
+    return grid.convert("RGB")
 
-# image, gt = next(iter(train_dl))
-# gt = gt[0, 0, ...]
-# image = label_img_to_color(gt.numpy())
-# image.show()
+
+def visualize_batched_image_and_gt(image, gt, n_cols, alpha=0.7):
+    image = visualize_batched_image(image, n_cols=n_cols)
+    gt = visualize_batched_gt(gt, n_cols=n_cols)
+    return Image.blend(image, gt, alpha=alpha)
