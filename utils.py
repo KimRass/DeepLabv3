@@ -139,6 +139,7 @@ def visualize_batched_gt(gt, n_cols):
     Args:
         gt: `(b, 1, h, w)` (dtype: `torch.long()`)
     """
+    gt[gt == 255] = 0
     grid = make_grid(gt, nrow=n_cols, pad_value=21)
     grid = Image.fromarray(grid[0].numpy().astype("uint8"), mode="P")
     grid.putpalette(sum(VOC_COLORMAP, ()))
