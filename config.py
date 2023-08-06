@@ -51,3 +51,21 @@ VOC_COLORMAP = [
     (255, 255, 255),
 ]
 IMG_SIZE = 513
+N_WORKERS = 4
+
+### Optimizer
+INIT_LR = 0.007
+MOMENTUM = 0.9
+WEIGHT_DECAY = 0.0004
+
+## Training
+N_STEPS = 300_000 # In the paper
+N_PRINT_STEPS = 500
+N_CKPT_STEPS = 6000
+N_EVAL_STEPS = 3000
+
+### Checkpoint
+CKPT_PATH = "/home/user/cv/deeplabv3_from_scratch/checkpoints/36000.pth"
+STEP = None
+TRANS_PHASE = None
+RESOL_IDX = None

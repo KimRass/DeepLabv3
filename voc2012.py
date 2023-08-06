@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 from PIL import Image

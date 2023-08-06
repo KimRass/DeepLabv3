@@ -6,10 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split
 from torch.optim import SGD, Adam
-# from torch.cuda.amp.grad_scaler import GradScaler
+from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
 from time import time
 
+import config
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
@@ -48,46 +49,43 @@ def validate(val_dl, model, metric):
 # and $initial learning rate = 0.007$, we then freeze batch normalization parameters,
 # employ `output_stride = 8`, and train on the official PASCAL VOC 2012 trainval set
 # for another 30K iterations and smaller $base learning rate = 0.001$."
-IMG_SIZE = 513
-BATCH_SIZE = 16
-N_WORKERS = 4
-# IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
-# GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
-IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-GT_DIR = "/home/user/cv/SegmentationClassAug"
-INIT_LR = 0.007
-# INIT_LR = 0.07
-MOMENTUM = 0.9
-WEIGHT_DECAY = 0.0004
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 model = nn.DataParallel(model, output_device=0)
-optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
-# optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
-# scaler = GradScaler()
+optim = SGD(
+    params=model.parameters(), lr=config.INIT_LR, momentum=config.MOMENTUM, weight_decay=config.WEIGHT_DECAY
+)
 
-train_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="train")
+scaler = GradScaler()
+
+train_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="train")
 train_dl = DataLoader(
-    train_ds, batch_size=BATCH_SIZE, shuffle=True, num_workers=N_WORKERS, pin_memory=True, drop_last=True
+    train_ds, batch_size=config.BATCH_SIZE, shuffle=True, num_workers=config.N_WORKERS, pin_memory=True, drop_last=True
 )
 train_di = iter(train_dl)
 
-val_ds = VOC2012Dataset(img_dir=IMG_DIR, gt_dir=GT_DIR, split="val")
-val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=N_WORKERS)
+val_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="val")
+val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WORKERS)
 
 crit = DeepLabLoss()
 metric = PixelmIoU()
 
+# Resume from checkpoint.
+if config.CKPT_PATH is not None:
+    ckpt = torch.load(config.CKPT_PATH, map_location=DEVICE)
+    init_step = ckpt["ckpt"]
+    n_steps = ckpt["number_of_steps"]
+    model.load_state_dict(ckpt["model"])
+    optim.load_state_dict(ckpt["optimizer"])
+else:
+    init_step = 0
+    n_steps = config.N_STEPS
+
 ### Train.
-N_STEPS = 300_000 # In the paper
-# N_STEPS = 600_000 # In my case
-N_PRINT_STEPS = 500
-N_CKPT_STEPS = 6000
-N_EVAL_STEPS = 3000
 running_loss = 0
 start_time = time()
-for step in range(1, N_STEPS + 1):
+for step in range(init_step + 1, n_steps + 1):
     model.train()
 
     try:
@@ -98,7 +96,7 @@ for step in range(1, N_STEPS + 1):
     image = image.to(DEVICE)
     gt = gt.to(DEVICE)
 
-    lr = get_lr(init_lr=INIT_LR, step=step, n_steps=N_STEPS)
+    lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
     optim.param_groups[0]["lr"] = lr
 
     # with torch.autocast(device_type=DEVICE.type, dtype=torch.float16):
@@ -114,29 +112,29 @@ for step in range(1, N_STEPS + 1):
 
     running_loss += loss.item()
 
-    if step % N_PRINT_STEPS == 0:
-        running_loss /= N_PRINT_STEPS
-        print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
+    if step % config.N_PRINT_STEPS == 0:
+        running_loss /= config.N_PRINT_STEPS
+        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Loss: {running_loss:.4f} ]""")
         running_loss = 0
 
         start_time = time()
 
-    if step % N_CKPT_STEPS == 0:
+    if step % config.N_CKPT_STEPS == 0:
         save_checkpoint(
             step=step,
-            n_steps=N_STEPS,
+            n_steps=n_steps,
             model=model,
             optim=optim,
             save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
         )
-        print(f"""Saved checkpoint at step {step:,}/{N_STEPS:,}.""")
+        print(f"""Saved checkpoint at step {step:,}/{n_steps:,}.""")
 
     ### Validate.
-    if step % N_EVAL_STEPS == 0:
+    if step % config.N_EVAL_STEPS == 0:
         start_time = time()
 
         model.eval()
         avg_miou = validate(val_dl=val_dl, model=model, metric=metric)
-        print(f"""[ {step:,}/{N_STEPS:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
+        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Average mIoU: {avg_miou:.4f} ]""")
