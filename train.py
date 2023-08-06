@@ -54,14 +54,22 @@ DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
 model = nn.DataParallel(model, output_device=0)
 optim = SGD(
-    params=model.parameters(), lr=config.INIT_LR, momentum=config.MOMENTUM, weight_decay=config.WEIGHT_DECAY
+    params=model.parameters(),
+    lr=config.INIT_LR,
+    momentum=config.MOMENTUM,
+    weight_decay=config.WEIGHT_DECAY,
 )
 
 scaler = GradScaler()
 
 train_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="train")
 train_dl = DataLoader(
-    train_ds, batch_size=config.BATCH_SIZE, shuffle=True, num_workers=config.N_WORKERS, pin_memory=True, drop_last=True
+    train_ds,
+    batch_size=config.BATCH_SIZE,
+    shuffle=True,
+    num_workers=config.N_WORKERS,
+    pin_memory=True,
+    drop_last=True,
 )
 train_di = iter(train_dl)
 
@@ -74,7 +82,7 @@ metric = PixelmIoU()
 # Resume from checkpoint.
 if config.CKPT_PATH is not None:
     ckpt = torch.load(config.CKPT_PATH, map_location=DEVICE)
-    init_step = ckpt["ckpt"]
+    init_step = ckpt["step"]
     n_steps = ckpt["number_of_steps"]
     model.load_state_dict(ckpt["model"])
     optim.load_state_dict(ckpt["optimizer"])
