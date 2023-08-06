@@ -80,8 +80,8 @@ crit = DeepLabLoss()
 metric = PixelmIoU()
 
 ### Train.
-# N_STEPS = 300_000 # In the paper
-N_STEPS = 600_000 # In my case
+N_STEPS = 300_000 # In the paper
+# N_STEPS = 600_000 # In my case
 N_PRINT_STEPS = 500
 N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
