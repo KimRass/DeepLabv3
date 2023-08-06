@@ -11,32 +11,8 @@ from torchvision.utils import make_grid
 from time import time
 from datetime import timedelta
 
-IMG_SIZE = 513
+import config
 
-VOC_COLORMAP = [
-    (0, 0, 0),
-    (128, 0, 0),
-    (0, 128, 0),
-    (128, 128, 0),
-    (0, 0, 128),
-    (128, 0, 128),
-    (0, 128, 128),
-    (128, 128, 128),
-    (64, 0, 0),
-    (192, 0, 0),
-    (64, 128, 0),
-    (192, 128, 0),
-    (64, 0, 128),
-    (192, 0, 128),
-    (64, 128, 128),
-    (192, 128, 128),
-    (0, 64, 0),
-    (128, 64, 0),
-    (0, 192, 0),
-    (128, 192, 0),
-    (0, 64, 128),
-    (255, 255, 255),
-]
 
 def get_val_filenames(img_dir):
     val_txt_path = Path(img_dir).parent/"ImageSets/Segmentation/val.txt"
@@ -124,7 +100,7 @@ def save_checkpoint(step, n_steps, model, optim, save_path):
 #         img: `(h, w)` (uint8)
 #     """
 #     image = Image.fromarray(img.astype("uint8"), mode="P")
-#     image.putpalette(sum(VOC_COLORMAP, []))
+#     image.putpalette(sum(config.VOC_COLORMAP, []))
 #     return image
 
 
@@ -142,7 +118,7 @@ def visualize_batched_gt(gt, n_cols):
     gt[gt == 255] = 0
     grid = make_grid(gt, nrow=n_cols, pad_value=21)
     grid = Image.fromarray(grid[0].numpy().astype("uint8"), mode="P")
-    grid.putpalette(sum(VOC_COLORMAP, ()))
+    grid.putpalette(sum(config.VOC_COLORMAP, ()))
     return grid.convert("RGB")
 
 
