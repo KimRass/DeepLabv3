@@ -62,7 +62,7 @@ WEIGHT_DECAY = 0.0004
 
 DEVICE = get_device()
 model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
-# model = nn.DataParallel(model, output_device=0)
+model = nn.DataParallel(model, output_device=0)
 optim = SGD(params=model.parameters(), lr=INIT_LR, momentum=MOMENTUM, weight_decay=WEIGHT_DECAY)
 # optim = Adam(params=model.parameters(), betas=(0, 0.99), eps=1e-8)
 scaler = GradScaler()
