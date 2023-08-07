@@ -14,7 +14,7 @@ from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelmIoU
-from utils import get_device, get_elapsed_time, save_checkpoint
+from utils import get_elapsed_time, save_checkpoint
 
 # "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed
 # when setting the CRF parameters."
