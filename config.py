@@ -59,7 +59,6 @@ MULTI_GPU = True
 BATCH_SIZE = 14 # In my case (because of memory shortage)
 N_WORKERS = 4
 AUTOCAST = True
-print(f"""AUTOCAST = {AUTOCAST}""")
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
 N_CKPT_STEPS = 6000

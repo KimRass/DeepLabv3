@@ -14,11 +14,10 @@ import config
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
-from evaluate import PixelmIoU
+from evaluate import PixelIoUByClass
 from utils import get_elapsed_time, save_checkpoint
 
-# "We decouple the DCNN and CRF training stages, assuming the DCNN unary terms are fixed
-# when setting the CRF parameters."
+print(f"""AUTOCAST = {config.AUTOCAST}""")
 
 
 def get_lr(init_lr, step, n_steps, power=0.9):
@@ -29,18 +28,25 @@ def get_lr(init_lr, step, n_steps, power=0.9):
 
 
 def validate(val_dl, model, metric):
+    model.eval()
+
     with torch.no_grad():
-        sum_miou = 0
-        for batch, (image, gt) in enumerate(val_dl, start=1):
+        gts = list()
+        preds = list()
+        for image, gt in val_dl:
             image = image.to(config.DEVICE)
             gt = gt.to(config.DEVICE)
-
             pred = model(image)
-            miou = metric(pred=pred, gt=gt)
 
-            sum_miou += miou
-        avg_miou = sum_miou / batch
-    return avg_miou
+            gts.append(gt)
+            preds.append(pred)
+
+    ious = metric(pred=torch.cat(preds, dim=0), gt=torch.cat(gts, dim=0))
+    miou = sum(ious.values()) / len(ious)
+    print(f"""Pixel IoU by Class:\n{ious}""")
+    print(f"""mIoU: {miou}""")
+
+    model.train()
 
 
 model = DeepLabv3ResNet101(output_stride=16).to(config.DEVICE)
@@ -84,9 +90,11 @@ val_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="val
 val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WORKERS)
 
 crit = DeepLabLoss()
-metric = PixelmIoU()
+metric = PixelIoUByClass()
 
 ### Train.
+validate(val_dl=val_dl, model=model, metric=metric)
+
 running_loss = 0
 start_time = time()
 for step in range(init_step + 1, n_steps + 1):
@@ -140,8 +148,4 @@ for step in range(init_step + 1, n_steps + 1):
 
     ### Validate.
     if step % config.N_EVAL_STEPS == 0:
-        model.eval()
-        avg_miou = validate(val_dl=val_dl, model=model, metric=metric)
-        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ Average mIoU: {avg_miou:.4f} ]""")
-
-        model.train()
+        validate(val_dl=val_dl, model=model, metric=metric)
