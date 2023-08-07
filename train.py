@@ -16,16 +16,9 @@ from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelIoUByClass
-from utils import get_elapsed_time, save_checkpoint
+from utils import get_lr, get_elapsed_time, save_checkpoint
 
 print(f"""AUTOCAST = {config.AUTOCAST}""")
-
-
-def get_lr(init_lr, step, n_steps, power=0.9):
-    # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
-    # by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
-    lr = init_lr * (1 - (step / n_steps)) ** power
-    return lr
 
 
 # def validate(val_dl, model, metric):
@@ -45,7 +38,7 @@ def get_lr(init_lr, step, n_steps, power=0.9):
 #     ious = metric(pred=torch.cat(preds, dim=0), gt=torch.cat(gts, dim=0))
 #     miou = sum(ious.values()) / len(ious)
 #     print(f"""Pixel IoU by Class:\n{ious}""")
-#     print(f"""mIoU: {miou}""")
+#     print(f"""mIoU: {miou:.4f}""")
 
 #     model.train()
 
@@ -65,7 +58,7 @@ def validate(val_dl, model, metric):
 
             sum_miou += miou
     avg_miou = sum_miou / len(val_dl)
-    print(f"""Average mIoU: {avg_miou}""")
+    print(f"""Average mIoU: {avg_miou:.4f}""")
 
     model.train()
 
