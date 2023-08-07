@@ -1,6 +1,6 @@
 ### Data
-IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-GT_DIR = "/home/user/cv/SegmentationClassAug"
+IMG_DIR = "/home/ubuntu/project/cv/VOC2012/JPEGImages"
+GT_DIR = "/home/ubuntu/project/cv/SegmentationClassAug"
 VOC_CLASS_COLOR = {
     "background": (0, 0, 0),
     "aeroplane": (128, 0, 0),
