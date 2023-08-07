@@ -72,7 +72,7 @@ def get_elapsed_time(start_time):
     return timedelta(seconds=round(time() - start_time))
 
 
-def save_checkpoint(step, n_steps, model, optim, save_path):
+def save_checkpoint(step, n_steps, model, optim, scaler, save_path):
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     ckpt = {
@@ -80,6 +80,7 @@ def save_checkpoint(step, n_steps, model, optim, save_path):
         "number_of_steps": n_steps,
         "model": model.state_dict(),
         "optimizer": optim.state_dict(),
+        "scaler": scaler.state_dict(),
     }
     torch.save(ckpt, str(save_path))
 

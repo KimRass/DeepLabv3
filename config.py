@@ -36,6 +36,10 @@ IMG_SIZE = 513
 N_WORKERS = 4
 
 ### Optimizer
+# "After training on the 'trainaug' set with 30K iterations and $initial learning rate = 0.007$,
+# we then freeze batch normalization parameters, employ `output_stride = 8`, and train
+# on the official PASCAL VOC 2012 trainval set for another 30K iterations
+# and smaller $base learning rate = 0.001$."
 INIT_LR = 0.007
 MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
@@ -48,9 +52,14 @@ else:
     DEVICE = torch.device("cpu")
     print("Using CPU.")
 MULTI_GPU = True
-# BATCH_SIZE = 16
-BATCH_SIZE = 14
+# "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
+# and compute the batch normalization statistics with a batch size of 16.
+# "The batch normalization parameters are trained with $decay = 0.9997$."
+# BATCH_SIZE = 16 # In the paper
+BATCH_SIZE = 14 # In my case (because of memory shortage)
 N_WORKERS = 4
+AUTOCAST = True
+print(f"""AUTOCAST = {AUTOCAST}""")
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
 N_CKPT_STEPS = 6000

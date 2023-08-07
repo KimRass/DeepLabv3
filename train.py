@@ -8,6 +8,7 @@ from torch.optim import SGD, Adam
 from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
 from time import time
+from contextlib import nullcontext
 
 import config
 from voc2012 import VOC2012Dataset
@@ -42,13 +43,6 @@ def validate(val_dl, model, metric):
     return avg_miou
 
 
-# "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
-# and compute the batch normalization statistics with a batch size of 16. The batch normalization parameters
-# are trained with $decay = 0.9997$. After training on the 'trainaug' set with 30K iterations
-# and $initial learning rate = 0.007$, we then freeze batch normalization parameters,
-# employ `output_stride = 8`, and train on the official PASCAL VOC 2012 trainval set
-# for another 30K iterations and smaller $base learning rate = 0.001$."
-
 model = DeepLabv3ResNet101(output_stride=16).to(config.DEVICE)
 if config.MULTI_GPU:
     print(f"""Using {torch.cuda.device_count()} GPU(s).""")
@@ -62,6 +56,18 @@ optim = SGD(
 )
 
 scaler = GradScaler()
+
+# Resume from checkpoint.
+if config.CKPT_PATH is not None:
+    ckpt = torch.load(config.CKPT_PATH, map_location=config.DEVICE)
+    init_step = ckpt["step"]
+    n_steps = ckpt["number_of_steps"]
+    model.load_state_dict(ckpt["model"])
+    optim.load_state_dict(ckpt["optimizer"])
+    scaler.load_state_dict(ckpt["scaler"])
+else:
+    init_step = 0
+    n_steps = config.N_STEPS
 
 train_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="train")
 train_dl = DataLoader(
@@ -80,23 +86,10 @@ val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WO
 crit = DeepLabLoss()
 metric = PixelmIoU()
 
-# Resume from checkpoint.
-if config.CKPT_PATH is not None:
-    ckpt = torch.load(config.CKPT_PATH, map_location=config.DEVICE)
-    init_step = ckpt["step"]
-    n_steps = ckpt["number_of_steps"]
-    model.load_state_dict(ckpt["model"])
-    optim.load_state_dict(ckpt["optimizer"])
-else:
-    init_step = 0
-    n_steps = config.N_STEPS
-
 ### Train.
 running_loss = 0
 start_time = time()
 for step in range(init_step + 1, n_steps + 1):
-    model.train()
-
     try:
         image, gt = next(train_di)
     except StopIteration:
@@ -108,16 +101,21 @@ for step in range(init_step + 1, n_steps + 1):
     lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
     optim.param_groups[0]["lr"] = lr
 
-    # with torch.autocast(device_type=config.DEVICE.type, dtype=torch.float16):
-    pred = model(image)
-
     optim.zero_grad()
-    loss = crit(pred=pred, gt=gt)
-    # scaler.scale(loss).backward()
-    # scaler.step(optim)
-    # scaler.update()
-    loss.backward()
-    optim.step()
+
+    with torch.autocast(
+        device_type=config.DEVICE.type, dtype=torch.float16
+    ) if config.AUTOCAST else nullcontext():
+        pred = model(image)
+        loss = crit(pred=pred, gt=gt)
+
+    if config.AUTOCAST:
+        scaler.scale(loss).backward()
+        scaler.step(optim)
+        scaler.update()
+    else:
+        loss.backward()
+        optim.step()
 
     running_loss += loss.item()
 
@@ -135,15 +133,15 @@ for step in range(init_step + 1, n_steps + 1):
             n_steps=n_steps,
             model=model,
             optim=optim,
+            scaler=scaler,
             save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
         )
         print(f"""Saved checkpoint at step {step:,}/{n_steps:,}.""")
 
     ### Validate.
     if step % config.N_EVAL_STEPS == 0:
-        start_time = time()
-
         model.eval()
         avg_miou = validate(val_dl=val_dl, model=model, metric=metric)
-        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
-        print(f"""[ Average mIoU: {avg_miou:.4f} ]""")
+        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ Average mIoU: {avg_miou:.4f} ]""")
+
+        model.train()
