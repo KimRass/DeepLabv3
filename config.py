@@ -1,6 +1,6 @@
 ### Data
-IMG_DIR = "/home/ubuntu/project/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-GT_DIR = "/home/ubuntu/project/cv/SegmentationClassAug"
+IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
+GT_DIR = "/home/user/cv/SegmentationClassAug"
 VOC_CLASS_COLOR = {
     "background": (0, 0, 0),
     "aeroplane": (128, 0, 0),
@@ -45,7 +45,6 @@ N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
 
 ### Checkpoint
-# CKPT_PATH = "/home/user/cv/deeplabv3_from_scratch/checkpoints/36000.pth"
 CKPT_PATH = None
 STEP = None
 TRANS_PHASE = None
