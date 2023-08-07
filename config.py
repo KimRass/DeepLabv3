@@ -1,3 +1,5 @@
+import torch
+
 ### Data
 IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
 GT_DIR = "/home/user/cv/SegmentationClassAug"
@@ -37,6 +39,13 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
 
 ## Training
+if torch.cuda.is_available():
+    DEVICE = torch.device("cuda")
+    print("Using GPU.")
+else:
+    DEVICE = torch.device("cpu")
+    print("Using CPU.")
+MULTI_GPU = False
 BATCH_SIZE = 16
 N_WORKERS = 4
 N_STEPS = 300_000 # In the paper

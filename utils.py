@@ -68,16 +68,6 @@ def get_image_dataset_mean_and_std(data_dir, ext="jpg"):
     return mean, std
 
 
-def get_device():
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-        print(f"""Using {torch.cuda.device_count()} GPU(s).""")
-    else:
-        device = torch.device("cpu")
-        print("Using CPU.")
-    return device
-
-
 def get_elapsed_time(start_time):
     return timedelta(seconds=round(time() - start_time))
 

@@ -31,8 +31,8 @@ def validate(val_dl, model, metric):
     with torch.no_grad():
         sum_miou = 0
         for batch, (image, gt) in enumerate(val_dl, start=1):
-            image = image.to(DEVICE)
-            gt = gt.to(DEVICE)
+            image = image.to(config.DEVICE)
+            gt = gt.to(config.DEVICE)
 
             pred = model(image)
             miou = metric(pred=pred, gt=gt)
@@ -49,9 +49,11 @@ def validate(val_dl, model, metric):
 # employ `output_stride = 8`, and train on the official PASCAL VOC 2012 trainval set
 # for another 30K iterations and smaller $base learning rate = 0.001$."
 
-DEVICE = get_device()
-model = DeepLabv3ResNet101(output_stride=16).to(DEVICE)
-model = nn.DataParallel(model, output_device=0)
+model = DeepLabv3ResNet101(output_stride=16).to(config.DEVICE)
+if config.MULTI_GPU:
+    print(f"""Using {torch.cuda.device_count()} GPU(s).""")
+    model = nn.DataParallel(model)
+
 optim = SGD(
     params=model.parameters(),
     lr=config.INIT_LR,
@@ -80,7 +82,7 @@ metric = PixelmIoU()
 
 # Resume from checkpoint.
 if config.CKPT_PATH is not None:
-    ckpt = torch.load(config.CKPT_PATH, map_location=DEVICE)
+    ckpt = torch.load(config.CKPT_PATH, map_location=config.DEVICE)
     init_step = ckpt["step"]
     n_steps = ckpt["number_of_steps"]
     model.load_state_dict(ckpt["model"])
@@ -100,13 +102,13 @@ for step in range(init_step + 1, n_steps + 1):
     except StopIteration:
         train_di = iter(train_dl)
         image, gt = next(train_di)
-    image = image.to(DEVICE)
-    gt = gt.to(DEVICE)
+    image = image.to(config.DEVICE)
+    gt = gt.to(config.DEVICE)
 
     lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
     optim.param_groups[0]["lr"] = lr
 
-    # with torch.autocast(device_type=DEVICE.type, dtype=torch.float16):
+    # with torch.autocast(device_type=config.DEVICE.type, dtype=torch.float16):
     pred = model(image)
 
     optim.zero_grad()
