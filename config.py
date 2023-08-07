@@ -47,8 +47,9 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
     print("Using CPU.")
-MULTI_GPU = False
-BATCH_SIZE = 16
+MULTI_GPU = True
+# BATCH_SIZE = 16
+BATCH_SIZE = 14
 N_WORKERS = 4
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
