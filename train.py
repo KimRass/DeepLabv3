@@ -28,24 +28,44 @@ def get_lr(init_lr, step, n_steps, power=0.9):
     return lr
 
 
+# def validate(val_dl, model, metric):
+#     model.eval()
+
+#     with torch.no_grad():
+#         gts = list()
+#         preds = list()
+#         for image, gt in tqdm(val_dl):
+#             image = image.to(config.DEVICE)
+#             gt = gt.to(config.DEVICE)
+#             pred = model(image)
+
+#             gts.append(gt)
+#             preds.append(pred)
+
+#     ious = metric(pred=torch.cat(preds, dim=0), gt=torch.cat(gts, dim=0))
+#     miou = sum(ious.values()) / len(ious)
+#     print(f"""Pixel IoU by Class:\n{ious}""")
+#     print(f"""mIoU: {miou}""")
+
+#     model.train()
+
+
 def validate(val_dl, model, metric):
     model.eval()
 
     with torch.no_grad():
-        gts = list()
-        preds = list()
+        sum_miou = 0
         for image, gt in tqdm(val_dl):
             image = image.to(config.DEVICE)
             gt = gt.to(config.DEVICE)
             pred = model(image)
 
-            gts.append(gt)
-            preds.append(pred)
+            ious = metric(pred=pred, gt=gt)
+            miou = sum(ious.values()) / len(ious)
 
-    ious = metric(pred=torch.cat(preds, dim=0), gt=torch.cat(gts, dim=0))
-    miou = sum(ious.values()) / len(ious)
-    print(f"""Pixel IoU by Class:\n{ious}""")
-    print(f"""mIoU: {miou}""")
+            sum_miou += miou
+    avg_miou = sum_miou / len(val_dl)
+    print(f"""Average mIoU: {avg_miou}""")
 
     model.train()
 
