@@ -48,11 +48,14 @@ def validate(val_dl, model, metric):
 
     model.train()
 
-
 model = DeepLabv3ResNet101(output_stride=16).to(config.DEVICE)
 if config.MULTI_GPU:
     print(f"""Using {torch.cuda.device_count()} GPU(s).""")
     model = nn.DataParallel(model)
+elif config.DEVICE.type == "cuda":
+    print("Using GPU.")
+else:
+    print("Using CPU.")
 
 optim = SGD(
     params=model.parameters(),
