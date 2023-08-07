@@ -45,7 +45,8 @@ N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
 
 ### Checkpoint
-CKPT_PATH = "/home/user/cv/deeplabv3_from_scratch/checkpoints/36000.pth"
+# CKPT_PATH = "/home/user/cv/deeplabv3_from_scratch/checkpoints/36000.pth"
+CKPT_PATH = None
 STEP = None
 TRANS_PHASE = None
 RESOL_IDX = None

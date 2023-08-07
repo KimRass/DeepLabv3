@@ -18,16 +18,16 @@ class PixelmIoU(nn.Module):
         for c in range(config.N_CLASSES):
             pred_mask = (argmax == c)
             gt_mask = (gt == c)
+            if gt_mask.sum().item() == 0:
+                iou = None
 
             union = (pred_mask | gt_mask).sum().item()
-            if union == 0:
-                continue
-
             intersec = (pred_mask & gt_mask).sum().item()
             iou = intersec / union
 
             ious.append(iou)
-        miou = sum(ious) / len(ious)
+        # miou = sum(ious) / len(ious)
+        miou = np.nanmean(ious)
         return miou
 
 
