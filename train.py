@@ -9,6 +9,7 @@ from torch.cuda.amp.grad_scaler import GradScaler
 from pathlib import Path
 from time import time
 from contextlib import nullcontext
+from tqdm.auto import tqdm
 
 import config
 from voc2012 import VOC2012Dataset
@@ -33,7 +34,7 @@ def validate(val_dl, model, metric):
     with torch.no_grad():
         gts = list()
         preds = list()
-        for image, gt in val_dl:
+        for image, gt in tqdm(val_dl):
             image = image.to(config.DEVICE)
             gt = gt.to(config.DEVICE)
             pred = model(image)
@@ -48,9 +49,10 @@ def validate(val_dl, model, metric):
 
     model.train()
 
+
 model = DeepLabv3ResNet101(output_stride=16).to(config.DEVICE)
 if config.MULTI_GPU:
-    print(f"""Using {torch.cuda.device_count()} GPU(s).""")
+    print(f"""Using {torch.cuda.device_count()} GPUs.""")
     model = nn.DataParallel(model)
 elif config.DEVICE.type == "cuda":
     print("Using GPU.")
