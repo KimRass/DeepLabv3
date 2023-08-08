@@ -49,12 +49,11 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 MULTI_GPU = True
-print(f"""Using {torch.cuda.device_count()} GPU(s).""")
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16.
 # "The batch normalization parameters are trained with $decay = 0.9997$."
-# BATCH_SIZE = 16 # In the paper
-BATCH_SIZE = 14 # In my case (because of memory shortage)
+BATCH_SIZE = 16 # In the paper
+# BATCH_SIZE = 14 # In my case (because of memory shortage)
 N_WORKERS = 0
 AUTOCAST = True
 N_STEPS = 300_000 # In the paper

@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import SGD, Adam
-from torch.cuda.amp.grad_scaler import GradScaler
+from torch.cuda.amp import GradScaler
 from pathlib import Path
 from time import time
 from contextlib import nullcontext
