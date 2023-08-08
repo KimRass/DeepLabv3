@@ -98,7 +98,7 @@ def save_checkpoint(step, n_steps, model, optim, scaler, save_path):
 #         img: `(h, w)` (uint8)
 #     """
 #     image = Image.fromarray(img.astype("uint8"), mode="P")
-#     image.putpalette(sum(config.VOC_COLORMAP, []))
+#     image.putpalette(sum(config.VOC_COLORS, []))
 #     return image
 
 
@@ -116,7 +116,7 @@ def visualize_batched_gt(gt, n_cols):
     gt[gt == 255] = 0
     grid = make_grid(gt, nrow=n_cols, pad_value=21)
     grid = Image.fromarray(grid[0].numpy().astype("uint8"), mode="P")
-    grid.putpalette(sum(config.VOC_COLORMAP, ()))
+    grid.putpalette(sum(config.VOC_COLORS, ()))
     return grid.convert("RGB")
 
 

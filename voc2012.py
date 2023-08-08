@@ -93,3 +93,5 @@ if __name__ == "__main__":
         vis = visualize_batched_image_and_gt(image, gt, n_cols=4, alpha=0.7)
         vis.save(f"""/Users/jongbeomkim/Desktop/workspace/deeplabv3_from_scratch/input_images/{cnt}.jpg""")
         cnt += 1
+
+# "We also randomly adjust the exposure and saturation of the image by up to a factor of 1.5 in the HSV color space. 2.3. Inference Just like in training, predicting detections for a test image

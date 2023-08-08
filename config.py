@@ -1,10 +1,6 @@
 import torch
 
 ### Data
-IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-GT_DIR = "/home/user/cv/SegmentationClassAug"
-# IMG_DIR = "/home/ubuntu/project/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-# GT_DIR = "/home/ubuntu/project/cv/SegmentationClassAug"
 VOC_CLASS_COLOR = {
     "background": (0, 0, 0),
     "aeroplane": (128, 0, 0),
@@ -28,12 +24,15 @@ VOC_CLASS_COLOR = {
     "train": (128, 192, 0),
     "tvmonitor": (0, 64, 128),
     "GRID": (255, 255, 255),
-}
-VOC_CLASSES = list(VOC_CLASS_COLOR.keys())[: -1]
-N_CLASSES = len(VOC_CLASSES)
-VOC_COLORS = list(VOC_CLASS_COLOR.values())
-IMG_SIZE = 513
-N_WORKERS = 4
+} # DO NOT MODIFY
+VOC_CLASSES = list(VOC_CLASS_COLOR.keys())[: -1] # DO NOT MODIFY
+N_CLASSES = len(VOC_CLASSES) # DO NOT MODIFY
+VOC_COLORS = list(VOC_CLASS_COLOR.values()) # DO NOT MODIFY
+IMG_SIZE = 513 # DO NOT MODIFY
+# IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
+# GT_DIR = "/home/user/cv/SegmentationClassAug"
+IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
+GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 
 ### Optimizer
 # "After training on the 'trainaug' set with 30K iterations and $initial learning rate = 0.007$,
@@ -50,12 +49,13 @@ if torch.cuda.is_available():
 else:
     DEVICE = torch.device("cpu")
 MULTI_GPU = True
+print(f"""Using {torch.cuda.device_count()} GPU(s).""")
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16.
 # "The batch normalization parameters are trained with $decay = 0.9997$."
 # BATCH_SIZE = 16 # In the paper
 BATCH_SIZE = 14 # In my case (because of memory shortage)
-N_WORKERS = 4
+N_WORKERS = 0
 AUTOCAST = True
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
@@ -63,7 +63,7 @@ N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
 
 ### Checkpoint
-CKPT_PATH = None
+CKPT_PATH = "/Users/jongbeomkim/Downloads/deeplabv3_checkpoints/18000.pth"
 STEP = None
 TRANS_PHASE = None
 RESOL_IDX = None
