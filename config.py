@@ -29,10 +29,10 @@ VOC_CLASSES = list(VOC_CLASS_COLOR.keys())[: -1] # DO NOT MODIFY
 N_CLASSES = len(VOC_CLASSES) # DO NOT MODIFY
 VOC_COLORS = list(VOC_CLASS_COLOR.values()) # DO NOT MODIFY
 IMG_SIZE = 513 # DO NOT MODIFY
-# IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
-# GT_DIR = "/home/user/cv/SegmentationClassAug"
-IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
-GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
+IMG_DIR = "/home/user/cv/voc2012/VOCdevkit/VOC2012/JPEGImages"
+GT_DIR = "/home/user/cv/SegmentationClassAug"
+# IMG_DIR = "/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"
+# GT_DIR = "/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"
 
 ### Optimizer
 # "After training on the 'trainaug' set with 30K iterations and $initial learning rate = 0.007$,
@@ -63,7 +63,7 @@ N_CKPT_STEPS = 6000
 N_EVAL_STEPS = 3000
 
 ### Checkpoint
-CKPT_PATH = "/Users/jongbeomkim/Downloads/deeplabv3_checkpoints/18000.pth"
+CKPT_PATH = None
 STEP = None
 TRANS_PHASE = None
 RESOL_IDX = None

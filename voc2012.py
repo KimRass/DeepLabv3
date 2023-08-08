@@ -5,13 +5,12 @@ from PIL import Image
 from pathlib import Path
 import random
 
+import config
 from utils import (
     get_val_filenames,
     get_voc2012_trainaug_mean_and_std,
     visualize_batched_image_and_gt,
 )
-
-IMG_SIZE = 513
 
 
 class VOC2012Dataset(Dataset):
@@ -28,36 +27,47 @@ class VOC2012Dataset(Dataset):
         elif split == "val":
             self.gts = [i for i in self.gts if i.stem in filenames]
 
+    def _randomly_adjust_b_and_s(self, image):
+        image = TF.adjust_brightness(image, random.uniform(0.5, 1.5))
+        image = TF.adjust_saturation(image, random.uniform(0.5, 1.5))
+        return image
+
+    def _randomly_scale(self, image, gt): # Not in the paper
+        # "We apply data augmentation by randomly scaling the input images (from 0.5 to 2.0)."
+        w, h = gt.size
+        scale = random.uniform(0.5, 2)
+        size = (round(scale * h), round(scale * w))
+        gt = TF.resize(gt, size=size, interpolation=Image.NEAREST)
+        image = TF.resize(image, size=size)
+        return image, gt
+
+    def _randomly_crop(self, image, gt):
+        w, h = gt.size
+        padding = (max(0, config.IMG_SIZE - w), max(0, config.IMG_SIZE - h))
+        gt = TF.pad(gt, padding=padding, padding_mode="constant")
+        # "We employ crop size to be $513$ during both training and test on PASCAL VOC 2012 dataset."
+        t, l, h, w = T.RandomCrop.get_params(img=gt, output_size=(config.IMG_SIZE, config.IMG_SIZE))
+        gt = TF.crop(gt, top=t, left=l, height=h, width=w)
+
+        image = TF.pad(image, padding=padding, padding_mode="constant")
+        image = TF.crop(image, top=t, left=l, height=h, width=w)
+        return image, gt
+
     def _transform(self, image, gt):
         if self.split == "train": # 10,582 images and labels
+            image = self._randomly_adjust_b_and_s(image)
+
             # "Randomly left-right flipping"
             if random.random() > 0.5:
                 image = TF.hflip(image)
                 gt = TF.hflip(gt)
 
-            # "We apply data augmentation by randomly scaling the input images (from 0.5 to 2.0)."
-            w, h = gt.size
-            scale = random.uniform(0.5, 2)
-            size = (round(scale * h), round(scale * w))
-            gt = TF.resize(gt, size=size, interpolation=Image.NEAREST)
-
-            w, h = gt.size
-            padding = (max(0, IMG_SIZE - w), max(0, IMG_SIZE - h))
-            gt = TF.pad(gt, padding=padding, padding_mode="constant")
-            # "We employ crop size to be $513$ during both training and test on PASCAL VOC 2012 dataset."
-            t, l, h, w = T.RandomCrop.get_params(img=gt, output_size=(IMG_SIZE, IMG_SIZE))
-            gt = TF.crop(gt, top=t, left=l, height=h, width=w)
-
-            image = TF.resize(image, size=size)
-            image = TF.pad(image, padding=padding, padding_mode="constant")
-            image = TF.crop(image, top=t, left=l, height=h, width=w)
+            image, gt = self._randomly_scale(image=image, gt=gt)
+            image, gt = self._randomly_crop(image=image, gt=gt)
 
         elif self.split == "val": # 1,449 images and labels
-            w, h = gt.size
-            padding = (max(0, IMG_SIZE - w), max(0, IMG_SIZE - h))
-            gt = TF.center_crop(gt, output_size=IMG_SIZE)
-
-            image = TF.center_crop(image, output_size=IMG_SIZE)
+            gt = TF.center_crop(gt, output_size=config.IMG_SIZE)
+            image = TF.center_crop(image, output_size=config.IMG_SIZE)
         return image, gt
 
     def __len__(self):
@@ -91,7 +101,6 @@ if __name__ == "__main__":
     for _ in range(10):
         image, gt = next(iter(train_dl))
         vis = visualize_batched_image_and_gt(image, gt, n_cols=4, alpha=0.7)
+        vis.show()
         vis.save(f"""/Users/jongbeomkim/Desktop/workspace/deeplabv3_from_scratch/input_images/{cnt}.jpg""")
         cnt += 1
-
-# "We also randomly adjust the exposure and saturation of the image by up to a factor of 1.5 in the HSV color space. 2.3. Inference Just like in training, predicting detections for a test image
