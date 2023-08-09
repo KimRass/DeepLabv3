@@ -32,6 +32,13 @@ class VOC2012Dataset(Dataset):
         image = TF.adjust_saturation(image, random.uniform(0.5, 1.5))
         return image
 
+    # "Randomly left-right flipping"
+    def _randomly_flip_horizontally(self, image, gt, p=0.5):
+        if random.random() > 1 - p:
+            image = TF.hflip(image)
+            gt = TF.hflip(gt)
+        return image, gt
+
     def _randomly_scale(self, image, gt): # Not in the paper
         # "We apply data augmentation by randomly scaling the input images (from 0.5 to 2.0)."
         w, h = gt.size
@@ -56,12 +63,7 @@ class VOC2012Dataset(Dataset):
     def _transform(self, image, gt):
         if self.split == "train": # 10,582 images and labels
             image = self._randomly_adjust_b_and_s(image)
-
-            # "Randomly left-right flipping"
-            if random.random() > 0.5:
-                image = TF.hflip(image)
-                gt = TF.hflip(gt)
-
+            image, gt = self._randomly_flip_horizontally(image=image, gt=gt)
             image, gt = self._randomly_scale(image=image, gt=gt)
             image, gt = self._randomly_crop(image=image, gt=gt)
 
