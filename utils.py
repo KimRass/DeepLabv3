@@ -79,27 +79,21 @@ def get_elapsed_time(start_time):
     return timedelta(seconds=round(time() - start_time))
 
 
-def save_checkpoint(step, n_steps, model, optim, scaler, save_path):
+def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
     Path(save_path).parent.mkdir(parents=True, exist_ok=True)
 
     ckpt = {
         "step": step,
         "number_of_steps": n_steps,
-        "model": model.state_dict(),
         "optimizer": optim.state_dict(),
         "scaler": scaler.state_dict(),
     }
+    if n_gpus > 1 and config.MULTI_GPU:
+        ckpt["model"] = model.module.state_dict()
+    else:
+        ckpt["model"] = model.state_dict()
+
     torch.save(ckpt, str(save_path))
-
-
-# def label_img_to_color(img):
-#     """
-#     Args:
-#         img: `(h, w)` (uint8)
-#     """
-#     image = Image.fromarray(img.astype("uint8"), mode="P")
-#     image.putpalette(sum(config.VOC_COLORS, []))
-#     return image
 
 
 def visualize_batched_image(image, n_cols):

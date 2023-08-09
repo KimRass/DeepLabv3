@@ -44,10 +44,6 @@ MOMENTUM = 0.9
 WEIGHT_DECAY = 0.0004
 
 ## Training
-if torch.cuda.is_available():
-    DEVICE = torch.device("cuda")
-else:
-    DEVICE = torch.device("cpu")
 MULTI_GPU = True
 # "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
 # and compute the batch normalization statistics with a batch size of 16.
