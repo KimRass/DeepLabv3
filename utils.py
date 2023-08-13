@@ -68,32 +68,8 @@ def get_image_dataset_mean_and_std(data_dir, ext="jpg"):
     return mean, std
 
 
-def get_lr(init_lr, step, n_steps, power=0.9):
-    # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
-    # by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
-    lr = init_lr * (1 - (step / n_steps)) ** power
-    return lr
-
-
 def get_elapsed_time(start_time):
     return timedelta(seconds=round(time() - start_time))
-
-
-def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
-    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
-
-    ckpt = {
-        "step": step,
-        "number_of_steps": n_steps,
-        "optimizer": optim.state_dict(),
-        "scaler": scaler.state_dict(),
-    }
-    if n_gpus > 1 and config.MULTI_GPU:
-        ckpt["model"] = model.module.state_dict()
-    else:
-        ckpt["model"] = model.state_dict()
-
-    torch.save(ckpt, str(save_path))
 
 
 def visualize_batched_image(image, n_cols):

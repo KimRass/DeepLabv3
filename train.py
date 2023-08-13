@@ -16,11 +16,39 @@ from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
 from evaluate import PixelIoUByClass
-from utils import get_lr, get_elapsed_time, save_checkpoint
+from utils import get_elapsed_time
 
 print(f"""AUTOCAST = {config.AUTOCAST}""")
 print(f"""N_WORKES = {config.N_WORKERS}""")
 print(f"""BATCH_SIZE = {config.BATCH_SIZE}""")
+
+
+def get_lr(init_lr, step, n_steps, power=0.9):
+    # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
+    # by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
+    lr = init_lr * (1 - (step / n_steps)) ** power
+    return lr
+
+
+def update_lr(lr, optim):
+    optim.param_groups[0]["lr"] = lr
+
+
+def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+
+    ckpt = {
+        "step": step,
+        "number_of_steps": n_steps,
+        "optimizer": optim.state_dict(),
+        "scaler": scaler.state_dict(),
+    }
+    if n_gpus > 1 and config.MULTI_GPU:
+        ckpt["model"] = model.module.state_dict()
+    else:
+        ckpt["model"] = model.state_dict()
+
+    torch.save(ckpt, str(save_path))
 
 
 def validate(val_dl, model, metric, device):
@@ -110,7 +138,7 @@ for step in range(init_step + 1, n_steps + 1):
     gt = gt.to(DEVICE)
 
     lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
-    optim.param_groups[0]["lr"] = lr
+    update_lr(lr=lr, optim=optim)
 
     optim.zero_grad()
 
