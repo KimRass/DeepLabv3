@@ -53,7 +53,6 @@ def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
 
 def validate(val_dl, model, metric, device):
     model.eval()
-
     with torch.no_grad():
         sum_miou = 0
         for image, gt in tqdm(val_dl):
@@ -140,14 +139,13 @@ for step in range(init_step + 1, n_steps + 1):
     lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
     update_lr(lr=lr, optim=optim)
 
-    optim.zero_grad()
-
     with torch.autocast(
         device_type=DEVICE.type, dtype=torch.float16
     ) if config.AUTOCAST else nullcontext():
         pred = model(image)
         loss = crit(pred=pred, gt=gt)
 
+    optim.zero_grad()
     if config.AUTOCAST:
         scaler.scale(loss).backward()
         scaler.step(optim)
