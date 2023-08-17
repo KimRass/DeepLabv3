@@ -160,8 +160,8 @@ for step in range(init_step + 1, n_steps + 1):
         running_loss /= config.N_PRINT_STEPS
         print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
         print(f"""[ Loss: {running_loss:.4f} ]""")
-        running_loss = 0
 
+        running_loss = 0
         start_time = time()
 
     if step % config.N_CKPT_STEPS == 0:

@@ -55,7 +55,7 @@ AUTOCAST = True
 N_STEPS = 300_000 # In the paper
 N_PRINT_STEPS = 500
 N_CKPT_STEPS = 6000
-N_EVAL_STEPS = 3000
+N_VAL_STEPS = 3000
 
 ### Checkpoint
 CKPT_PATH = None
