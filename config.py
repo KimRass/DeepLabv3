@@ -1,5 +1,3 @@
-import torch
-
 ### Data
 VOC_CLASS_COLOR = {
     "background": (0, 0, 0),

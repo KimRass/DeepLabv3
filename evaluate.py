@@ -16,6 +16,9 @@ class PixelIoUByClass(nn.Module):
 
         ious = dict()
         for idx, c in enumerate(config.VOC_CLASSES):
+            if c == "background":
+                continue
+
             pred_mask = (argmax == idx)
             gt_mask = (gt == idx)
             if gt_mask.sum().item() == 0:
