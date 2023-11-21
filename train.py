@@ -9,13 +9,12 @@ from torch.cuda.amp import GradScaler
 from pathlib import Path
 from time import time
 from contextlib import nullcontext
-from tqdm.auto import tqdm
 
 import config
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
 from loss import DeepLabLoss
-from evaluate import PixelIoUByClass
+from evaluate import PixelIoUByClass, evaluate
 from utils import get_elapsed_time
 
 print(f"""AUTOCAST = {config.AUTOCAST}""")
@@ -49,25 +48,6 @@ def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
         ckpt["model"] = model.state_dict()
 
     torch.save(ckpt, str(save_path))
-
-
-def validate(val_dl, model, metric, device):
-    model.eval()
-    with torch.no_grad():
-        sum_miou = 0
-        for image, gt in tqdm(val_dl):
-            image = image.to(device)
-            gt = gt.to(device)
-            pred = model(image)
-
-            ious = metric(pred=pred, gt=gt)
-            miou = sum(ious.values()) / len(ious)
-
-            sum_miou += miou
-    avg_miou = sum_miou / len(val_dl)
-    print(f"""Average mIoU: {avg_miou:.4f}""")
-
-    model.train()
 
 
 model = DeepLabv3ResNet101(output_stride=16)
@@ -119,12 +99,12 @@ train_di = iter(train_dl)
 val_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="val")
 val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WORKERS)
 
-crit = DeepLabLoss()
 metric = PixelIoUByClass()
+evaluate(val_dl=val_dl, model=model, metric=metric, device=DEVICE)
+
+crit = DeepLabLoss()
 
 ### Train.
-validate(val_dl=val_dl, model=model, metric=metric, device=DEVICE)
-
 running_loss = 0
 start_time = time()
 for step in range(init_step + 1, n_steps + 1):
@@ -177,4 +157,5 @@ for step in range(init_step + 1, n_steps + 1):
 
     ### Validate.
     if step % config.N_EVAL_STEPS == 0:
-        validate(val_dl=val_dl, model=model, metric=metric)
+        avg_miou = evaluate(val_dl=val_dl, model=model, metric=metric)
+        print(f"Average mIoU: {avg_miou:.4f}")

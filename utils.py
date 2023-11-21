@@ -10,8 +10,12 @@ import torchvision.transforms.functional as TF
 from torchvision.utils import make_grid
 from time import time
 from datetime import timedelta
+import re
+from collections import OrderedDict
 
 import config
+
+ROOT = Path(__file__).resolve().parent
 
 
 def get_val_filenames(img_dir):
@@ -94,3 +98,11 @@ def visualize_batched_image_and_gt(image, gt, n_cols, alpha=0.7):
     image = visualize_batched_image(image, n_cols=n_cols)
     gt = visualize_batched_gt(gt, n_cols=n_cols)
     return Image.blend(image, gt, alpha=alpha)
+
+
+def modify_state_dict(state_dict, pattern=r"^module.|^_orig_mod."):
+    new_state_dict = OrderedDict()
+    for old_key, value in state_dict.items():
+        new_key = re.sub(pattern=pattern, repl="", string=old_key)
+        new_state_dict[new_key] = value
+    return new_state_dict

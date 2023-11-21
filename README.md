@@ -1,8 +1,8 @@
 # 'DeepLabv3' (Chen et al., 2018) implementation from scratch in PyTorch
 ## Pre-traind Models
-- deeplabv3_voc2012.pth
+- [deeplabv3_voc2012.pth](https://drive.google.com/file/d/1sq95IFXpfx4ha_yZY7ddtxYwfGFcf74g/view?usp=sharing)
     - Trained on VOC 2012 training set for 18,000 steps.
-    - (I accidentally deleted the checkpoint...)
+    - Average mIoU on VOC 2012 validation set: 0.6643
 ## Prediction on VOC 2012 Validation Set
 - Ground truth
     - <img src="https://github.com/KimRass/DeepLabv3/assets/67457712/1004eed1-0fe1-4f7d-b8e4-87f41b699c93" width="700">
