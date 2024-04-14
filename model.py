@@ -8,7 +8,8 @@ import torch.nn.functional as F
 from torchvision.models import resnet101, ResNet101_Weights
 import einops
 import ssl
-from config import VOC_CLASSES
+
+from utils import VOC_CLASSES
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
