@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torchvision.models import resnet101, ResNet101_Weights
 import einops
 import ssl
+from config import VOC_CLASSES
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -80,10 +81,12 @@ class ResNetBlock(nn.Module):
         return x
 
 
-# "We define as `multi_grid = (r1, r2, r3)` the unit rates for the three convolutional layers within block4.
-# The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate
-# and the corresponding rate."
 class MultiGridResNetBlock(nn.Module):
+    """
+    "We define as `multi_grid = (r1, r2, r3)` the unit rates for the three convolutional layers within block4."
+    "The final atrous rate for the convolutional layer is equal to the multiplication of the unit rate
+        and the corresponding rate."
+    """
     def __init__(self, in_channels, out_channels, stride, rate, multi_grid):
         super().__init__()
 
@@ -158,13 +161,15 @@ class ResNet101Backbone(nn.Module):
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, kernel_size, dilation):
+        """
+        "All with 256 filters and batch normalization."
+        """
         super().__init__()
 
         self.in_channels = in_channels
         self.kernel_size = kernel_size
         self.dilation = dilation
 
-        # "All with 256 filters and batch normalization"
         self.conv = nn.Conv2d(
             in_channels,
             256,
@@ -278,18 +283,36 @@ class ResNet101DeepLabv3(nn.Module):
         References:
             https://github.com/VainF/DeepLabV3Plus-Pytorch/blob/master/utils/loss.py
         """
-        pred = model(image)
+        pred = self(image)
         pred = einops.rearrange(pred, pattern="b c h w -> (b h w) c")
         gt = einops.rearrange(gt, pattern="b c h w -> (b h w) c").squeeze(1)
         return F.cross_entropy(pred, gt, ignore_index=255, reduction="mean")
 
+    @staticmethod
+    def get_pixel_iou_by_cls(pred, gt):
+        """
+        "The performance is measured in terms of pixel intersection-over-union (IOU) averaged
+            across the 21 classes."
 
-if __name__ == "__main__":
-    x = torch.randn(2, 3, 513, 513)
-    model = ResNet101DeepLabv3(output_stride=16)
-    # model = ResNet101DeepLabv3(output_stride=8)
-    pred = model(x)
-    pred[0, 0, : 2, : 2]
-    x = F.interpolate(pred, size=(513, 513), mode="bilinear", align_corners=True)
-    x[0, 0, : 32, : 32]
-    print(pred.shape)
+        References:
+            https://gaussian37.github.io/vision-segmentation-miou/
+            https://stackoverflow.com/questions/62461379/multiclass-semantic-segmentation-model-evaluation
+        """
+        argmax = torch.argmax(pred, dim=1, keepdim=True)
+
+        ious = dict()
+        for idx, c in enumerate(VOC_CLASSES):
+            if c == "background":
+                continue
+
+            pred_mask = (argmax == idx)
+            gt_mask = (gt == idx)
+            if gt_mask.sum().item() == 0:
+                continue
+
+            union = (pred_mask | gt_mask).sum().item()
+            intersec = (pred_mask & gt_mask).sum().item()
+            iou = intersec / union
+
+            ious[c] = round(iou, 4)
+        return ious

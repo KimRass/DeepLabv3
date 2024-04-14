@@ -10,6 +10,7 @@ import torchvision.transforms.functional as TF
 from torchvision.utils import make_grid
 from time import time
 from datetime import timedelta
+from torch.cuda.amp import GradScaler
 import re
 from collections import OrderedDict
 import random
@@ -17,8 +18,6 @@ import os
 import numpy as np
 
 import config
-
-ROOT = Path(__file__).resolve().parent
 
 
 def get_device():
@@ -41,6 +40,10 @@ def set_seed(seed):
         torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
+
+
+def get_grad_scaler(device):
+    return GradScaler() if device.type == "cuda" else None
 
 
 def get_val_filenames(img_dir):

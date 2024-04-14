@@ -2,157 +2,271 @@
     # https://github.com/PengtaoJiang/OAA-PyTorch/blob/master/deeplab-pytorch/libs/utils/lr_scheduler.py
 
 import torch
-import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim import SGD
-from torch.cuda.amp import GradScaler
 from pathlib import Path
 from time import time
-from contextlib import nullcontext
+import contextlib
+from tqdm import tqdm
+import argparse
+import math
 
-import config
 from voc2012 import VOC2012Dataset
-from model import DeepLabv3ResNet101
-from evaluate import PixelIoUByClass, evaluate
-from utils import get_elapsed_time
-
-print(f"""AUTOCAST = {config.AUTOCAST}""")
-print(f"""N_WORKES = {config.N_WORKERS}""")
-print(f"""BATCH_SIZE = {config.BATCH_SIZE}""")
+from model import ResNet101DeepLabv3
+from utils import get_elapsed_time, get_device, set_seed, get_grad_scaler
 
 
-def get_lr(init_lr, step, n_steps, power=0.9):
-    # "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
-    # by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
-    lr = init_lr * (1 - (step / n_steps)) ** power
-    return lr
+def get_args():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--seed", type=int, required=False, default=123)
+    parser.add_argument("--img_dir", type=str, required=True)
+    parser.add_argument("--gt_dir", type=str, required=True)
+    parser.add_argument("--save_dir", type=str, required=True)
+    parser.add_argument("--batch_size", type=int, required=True)
+    parser.add_argument("--n_cpus", type=int, required=True)
+    parser.add_argument("--n_steps", type=int, required=False, default=300_000) # In the paper
+    parser.add_argument("--resume_from", type=str, required=False)
+    ### Optimizer
+    parser.add_argument("--init_lr", type=float, required=False, default=0.007)
+    parser.add_argument("--momentum", type=float, required=False, default=0.9)
+    parser.add_argument("--weight_decay", type=float, required=False, default=0.0004)
+    ### Logging
+    parser.add_argument("--log_every", type=int, required=False, default=500)
+    parser.add_argument("--save_every", type=int, required=False, default=6000)
+    parser.add_argument("--val_every", type=int, required=False, default=3000)
+
+    args = parser.parse_args()
+
+    args_dict = vars(args)
+    new_args_dict = dict()
+    for k, v in args_dict.items():
+        new_args_dict[k.upper()] = v
+    args = argparse.Namespace(**new_args_dict)
+    return args
 
 
-def update_lr(lr, optim):
-    optim.param_groups[0]["lr"] = lr
+class Trainer(object):
+    """
+    "After training on the 'trainaug' set with 30K iterations and $initial learning rate = 0.007$,
+        we then freeze batch normalization parameters, employ `output_stride = 8`, and train
+        on the official PASCAL VOC 2012 trainval set for another 30K iterations
+        and smaller $base learning rate = 0.001$."
+    "Since large batch size is required to train batch normalization parameters, we employ `output_stride=16`
+        and compute the batch normalization statistics with a batch size of 16."
+    "The batch normalization parameters are trained with $decay = 0.9997$."
+    """
+    def __init__(
+        self,
+        train_dl,
+        val_dl,
+        save_dir,
+        init_lr,
+        n_steps,
+        device,
+    ):
+        self.train_dl = train_dl
+        self.val_dl = val_dl
+        self.save_dir = Path(save_dir)
+        self.init_lr = init_lr
+        self.n_steps = n_steps
+        self.device = device
 
+    def get_lr(self, step, power=0.9):
+        """
+        "We employ a 'poly' learning rate policy where the initial learning rate is multiplied
+            by $(1 - \frac{iter}{max{\_}iter})^{power}$ with $power = 0.9$."
+        """
+        lr = self.init_lr * (1 - (step / self.n_steps)) ** power
+        return lr
 
-def save_checkpoint(step, n_steps, model, optim, scaler, n_gpus, save_path):
-    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def update_lr(lr, optim):
+        optim.param_groups[0]["lr"] = lr
 
-    ckpt = {
-        "step": step,
-        "number_of_steps": n_steps,
-        "optimizer": optim.state_dict(),
-        "scaler": scaler.state_dict(),
-    }
-    if n_gpus > 1 and config.MULTI_GPU:
-        ckpt["model"] = model.module.state_dict()
-    else:
-        ckpt["model"] = model.state_dict()
+    def train_for_one_step(self, image, gt, step, model, optim, scaler):
+        image = image.to(self.device)
+        gt = gt.to(self.device)
 
-    torch.save(ckpt, str(save_path))
+        lr = self.get_lr(step=step)
+        self.update_lr(lr=lr, optim=optim)
 
+        # with torch.autocast(
+        #     device_type=self.device.type, dtype=torch.float16,
+        # ) if self.device.type == "cuda" else contextlib.nullcontext():
+        #     loss = model.get_loss(image=image, gt=gt)
+        # optim.zero_grad()
+        # if scaler is not None:
+        #     scaler.scale(loss).backward()
+        #     scaler.step(optim)
+        #     scaler.update()
+        # else:
+        #     loss.backward()
+        #     optim.step()
+        loss = torch.randn(size=(1,), device=self.device)
+        return loss
 
-model = DeepLabv3ResNet101(output_stride=16)
-N_GPUS = torch.cuda.device_count()
-if N_GPUS > 0:
-    DEVICE = torch.device("cuda")
-    model = model.to(DEVICE)
-    if N_GPUS > 1 and config.MULTI_GPU:
-        model = nn.DataParallel(model)
+    def save_checkpoint(self, step, model, optim, scaler, save_path):
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        ckpt = {
+            "step": step,
+            "number_of_steps": self.n_steps,
+            "model": model.state_dict(),
+            "optimizer": optim.state_dict(),
+        }
+        if scaler is not None:
+            ckpt["scaler"] = scaler.state_dict()
+        torch.save(ckpt, str(save_path))
 
-        print(f"""Using {N_GPUS} GPUs.""")
-    else:
-        print("Using single GPU.")
-else:
-    print("Using CPU.")
+    def save_model_params(self, model, save_path):
+        Path(save_path).parent.mkdir(parents=True, exist_ok=True)
+        torch.save(model.state_dict(), str(save_path))
 
-optim = SGD(
-    params=model.parameters(),
-    lr=config.INIT_LR,
-    momentum=config.MOMENTUM,
-    weight_decay=config.WEIGHT_DECAY,
-)
+    @torch.inference_mode()
+    def validate(self, model):
+        model.eval()
 
-scaler = GradScaler()
+        # cum_miou = 0
+        # pbar = tqdm(self.val_dl)
+        # for image, gt in pbar:
+        #     pbar.set_description("Validating...")
 
-# Resume from checkpoint.
-if config.CKPT_PATH is not None:
-    ckpt = torch.load(config.CKPT_PATH, map_location=DEVICE)
-    init_step = ckpt["step"]
-    n_steps = ckpt["number_of_steps"]
-    model.load_state_dict(ckpt["model"])
-    optim.load_state_dict(ckpt["optimizer"])
-    scaler.load_state_dict(ckpt["scaler"])
-else:
-    init_step = 0
-    n_steps = config.N_STEPS
+        #     image = image.to(self.device)
+        #     gt = gt.to(self.device)
 
-train_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="train")
-train_dl = DataLoader(
-    train_ds,
-    batch_size=config.BATCH_SIZE,
-    shuffle=True,
-    num_workers=config.N_WORKERS,
-    pin_memory=True,
-    drop_last=True,
-)
-train_di = iter(train_dl)
+        #     pred = model(image)
+        #     ious = model.get_pixel_iou_by_cls(pred=pred, gt=gt)
+        #     miou = sum(ious.values()) / len(ious)
 
-val_ds = VOC2012Dataset(img_dir=config.IMG_DIR, gt_dir=config.GT_DIR, split="val")
-val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WORKERS)
+        #     cum_miou += miou
+        # avg_miou = cum_miou / len(self.val_dl)
+        import random
+        avg_miou = random.random()
 
-metric = PixelIoUByClass()
-evaluate(val_dl=val_dl, model=model, metric=metric, device=DEVICE)
+        model.train()
+        return avg_miou
 
-### Train.
-running_loss = 0
-start_time = time()
-for step in range(init_step + 1, n_steps + 1):
-    try:
-        image, gt = next(train_di)
-    except StopIteration:
-        train_di = iter(train_dl)
-        image, gt = next(train_di)
-    image = image.to(DEVICE)
-    gt = gt.to(DEVICE)
+    def train(
+        self,
+        init_step,
+        model,
+        optim,
+        scaler,
+        log_every,
+        save_every,
+        val_every,
+    ):
+        train_di = iter(self.train_dl)
 
-    lr = get_lr(init_lr=config.INIT_LR, step=step, n_steps=n_steps)
-    update_lr(lr=lr, optim=optim)
-
-    with torch.autocast(
-        device_type=DEVICE.type, dtype=torch.float16
-    ) if config.AUTOCAST else nullcontext():
-        loss = model.get_loos(image=image, gt=gt)
-        pred = model(image)
-
-    optim.zero_grad()
-    if config.AUTOCAST:
-        scaler.scale(loss).backward()
-        scaler.step(optim)
-        scaler.update()
-    else:
-        loss.backward()
-        optim.step()
-
-    running_loss += loss.item()
-
-    if step % config.N_PRINT_STEPS == 0:
-        running_loss /= config.N_PRINT_STEPS
-        print(f"""[ {step:,}/{n_steps:,} ][ {lr:4f} ][ {get_elapsed_time(start_time)} ]""", end="")
-        print(f"""[ Loss: {running_loss:.4f} ]""")
-
-        running_loss = 0
+        cum_loss = 0
+        min_avg_miou = math.inf
         start_time = time()
+        pbar = tqdm(range(init_step + 1, self.n_steps + 1), leave=False)
+        for step in pbar:
+            pbar.set_description("Training...")
 
-    if step % config.N_CKPT_STEPS == 0:
-        save_checkpoint(
-            step=step,
-            n_steps=n_steps,
-            model=model,
-            optim=optim,
-            scaler=scaler,
-            save_path=Path(__file__).parent/f"""checkpoints/{step}.pth""",
-        )
-        print(f"""Saved checkpoint at step {step:,}/{n_steps:,}.""")
+            try:
+                image, gt = next(train_di)
+            except StopIteration:
+                train_di = iter(self.train_dl)
+                image, gt = next(train_di)
+            loss = self.train_for_one_step(
+                step=step,
+                model=model,
+                optim=optim,
+                scaler=scaler,
+                image=image,
+                gt=gt,
+            )
+            cum_loss += loss.item()
 
-    ### Validate.
-    if step % config.N_EVAL_STEPS == 0:
-        avg_miou = evaluate(val_dl=val_dl, model=model, metric=metric)
-        print(f"Average mIoU: {avg_miou:.4f}")
+            if step % log_every == 0:
+                cum_loss /= log_every
+                log = f"[ {get_elapsed_time(start_time)} ][ {step:,}/{self.n_steps:,} ]\n"
+                log += f"[ Loss: {cum_loss:.4f} ]"
+                cum_loss = 0
+                start_time = time()
+
+            if step % save_every == 0:
+                self.save_checkpoint(
+                    step=step,
+                    model=model,
+                    optim=optim,
+                    scaler=scaler,
+                    save_path=self.save_dir/f"step={step}.pth",
+                )
+                log = f"[ {step:,}/{self.n_steps:,} ][ Checkpoint saved. ]"
+                print(log)
+
+            if step % val_every == 0:
+                avg_miou = self.validate(model=model)
+                if avg_miou < min_avg_miou:
+                    self.save_model_params(
+                        model=model,
+                        save_path=self.save_dir/f"step={step}-avg_miou={avg_miou:.4f}.pth",
+                    )
+                    min_avg_miou = avg_miou
+                log = f"[ {step:,}/{self.n_steps:,} ][ Average mIoU: {avg_miou:.4f} | {min_avg_miou:.4f} ]"
+                print(log)
+
+
+def main():
+    DEVICE = get_device()
+    args = get_args()
+    set_seed(args.SEED)
+
+    model = ResNet101DeepLabv3(output_stride=16).to(DEVICE)
+    optim = SGD(
+        params=model.parameters(),
+        lr=args.INIT_LR,
+        momentum=args.MOMENTUM,
+        weight_decay=args.WEIGHT_DECAY,
+    )
+    scaler = get_grad_scaler(device=DEVICE)
+
+    # Resume from checkpoint.
+    if args.RESUME_FROM is not None:
+        ckpt = torch.load(args.RESUME_FROM, map_location=DEVICE)
+        init_step = ckpt["step"]
+        n_steps = ckpt["number_of_steps"]
+        model.load_state_dict(ckpt["model"])
+        optim.load_state_dict(ckpt["optimizer"])
+        scaler.load_state_dict(ckpt["scaler"])
+    else:
+        init_step = 0
+        n_steps = args.N_STEPS
+
+    train_ds = VOC2012Dataset(img_dir=args.IMG_DIR, gt_dir=args.GT_DIR, split="train")
+    train_dl = DataLoader(
+        train_ds,
+        batch_size=args.BATCH_SIZE,
+        shuffle=True,
+        pin_memory=True,
+        drop_last=True,
+        persistent_workers=True,
+        num_workers=args.N_CPUS,
+    )
+
+    val_ds = VOC2012Dataset(img_dir=args.IMG_DIR, gt_dir=args.GT_DIR, split="val")
+    val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=args.N_CPUS)
+
+    trainer = Trainer(
+        train_dl=train_dl,
+        val_dl=val_dl,
+        save_dir=args.SAVE_DIR,
+        init_lr=args.INIT_LR,
+        n_steps=n_steps,
+        device=DEVICE,
+    )
+    trainer.train(
+        init_step=init_step,
+        model=model,
+        optim=optim,
+        scaler=scaler,
+        log_every=args.LOG_EVERY,
+        save_every=args.SAVE_EVERY,
+        val_every=args.VAL_EVERY,
+    )
+
+if __name__ == "__main__":
+    main()
