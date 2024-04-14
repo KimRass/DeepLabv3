@@ -13,7 +13,6 @@ from contextlib import nullcontext
 import config
 from voc2012 import VOC2012Dataset
 from model import DeepLabv3ResNet101
-from loss import DeepLabLoss
 from evaluate import PixelIoUByClass, evaluate
 from utils import get_elapsed_time
 
@@ -102,8 +101,6 @@ val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=config.N_WO
 metric = PixelIoUByClass()
 evaluate(val_dl=val_dl, model=model, metric=metric, device=DEVICE)
 
-crit = DeepLabLoss()
-
 ### Train.
 running_loss = 0
 start_time = time()
@@ -122,8 +119,8 @@ for step in range(init_step + 1, n_steps + 1):
     with torch.autocast(
         device_type=DEVICE.type, dtype=torch.float16
     ) if config.AUTOCAST else nullcontext():
+        loss = model.get_loos(image=image, gt=gt)
         pred = model(image)
-        loss = crit(pred=pred, gt=gt)
 
     optim.zero_grad()
     if config.AUTOCAST:

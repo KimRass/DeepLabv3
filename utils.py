@@ -12,10 +12,35 @@ from time import time
 from datetime import timedelta
 import re
 from collections import OrderedDict
+import random
+import os
+import numpy as np
 
 import config
 
 ROOT = Path(__file__).resolve().parent
+
+
+def get_device():
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        if torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+    return device
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
 
 
 def get_val_filenames(img_dir):
@@ -106,3 +131,18 @@ def modify_state_dict(state_dict, pattern=r"^module.|^_orig_mod."):
         new_key = re.sub(pattern=pattern, repl="", string=old_key)
         new_state_dict[new_key] = value
     return new_state_dict
+
+
+def denorm(tensor, mean, std):
+    return TF.normalize(
+        tensor, mean=- np.array(mean) / np.array(std), std=1 / np.array(std),
+    )
+
+
+def image_to_grid(image, mean, std, n_cols, padding=1):
+    tensor = image.clone().detach().cpu()
+    tensor = denorm(tensor, mean=mean, std=std)
+    grid = make_grid(tensor, nrow=n_cols, padding=1, pad_value=padding)
+    grid.clamp_(0, 1)
+    grid = TF.to_pil_image(grid)
+    return grid
