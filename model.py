@@ -169,8 +169,9 @@ class ConvBlock(nn.Module):
             in_channels,
             256,
             kernel_size,
-            dilation,
+            1,
             "same",
+            dilation,
             bias=False
         )
         self.bn = nn.BatchNorm2d(256)
