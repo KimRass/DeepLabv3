@@ -25,7 +25,7 @@ def get_args():
     parser.add_argument("--save_dir", type=str, required=True)
     parser.add_argument("--batch_size", type=int, required=True)
     parser.add_argument("--n_cpus", type=int, required=True)
-    parser.add_argument("--n_steps", type=int, required=False, default=300_000) # In the paper
+    parser.add_argument("--n_steps", type=int, required=False, default=30_000) # In the paper
     parser.add_argument("--resume_from", type=str, required=False)
     ### Optimizer
     parser.add_argument("--init_lr", type=float, required=False, default=0.007)
@@ -91,19 +91,19 @@ class Trainer(object):
         lr = self.get_lr(step=step)
         self.update_lr(lr=lr, optim=optim)
 
-        # with torch.autocast(
-        #     device_type=self.device.type, dtype=torch.float16,
-        # ) if self.device.type == "cuda" else contextlib.nullcontext():
-        #     loss = model.get_loss(image=image, gt=gt)
-        # optim.zero_grad()
-        # if scaler is not None:
-        #     scaler.scale(loss).backward()
-        #     scaler.step(optim)
-        #     scaler.update()
-        # else:
-        #     loss.backward()
-        #     optim.step()
-        loss = torch.randn(size=(1,), device=self.device)
+        with torch.autocast(
+            device_type=self.device.type, dtype=torch.float16,
+        ) if self.device.type == "cuda" else contextlib.nullcontext():
+            loss = model.get_loss(image=image, gt=gt)
+        optim.zero_grad()
+        if scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.step(optim)
+            scaler.update()
+        else:
+            loss.backward()
+            optim.step()
+        # loss = torch.randn(size=(1,), device=self.device)
         return loss
 
     def save_checkpoint(self, step, model, optim, scaler, save_path):
@@ -125,24 +125,22 @@ class Trainer(object):
     @torch.inference_mode()
     def validate(self, model):
         model.eval()
+        cum_miou = 0
+        pbar = tqdm(self.val_dl)
+        for image, gt in pbar:
+            pbar.set_description("Validating...")
 
-        # cum_miou = 0
-        # pbar = tqdm(self.val_dl)
-        # for image, gt in pbar:
-        #     pbar.set_description("Validating...")
+            image = image.to(self.device)
+            gt = gt.to(self.device)
 
-        #     image = image.to(self.device)
-        #     gt = gt.to(self.device)
+            pred = model(image)
+            ious = model.get_pixel_iou_by_cls(pred=pred, gt=gt)
+            miou = sum(ious.values()) / len(ious)
 
-        #     pred = model(image)
-        #     ious = model.get_pixel_iou_by_cls(pred=pred, gt=gt)
-        #     miou = sum(ious.values()) / len(ious)
-
-        #     cum_miou += miou
-        # avg_miou = cum_miou / len(self.val_dl)
-        import random
-        avg_miou = random.random()
-
+            cum_miou += miou
+        avg_miou = cum_miou / len(self.val_dl)
+        # import random
+        # avg_miou = random.random()
         model.train()
         return avg_miou
 
@@ -224,14 +222,15 @@ def main():
     )
     scaler = get_grad_scaler(device=DEVICE)
 
-    # Resume from checkpoint.
     if args.RESUME_FROM is not None:
         ckpt = torch.load(args.RESUME_FROM, map_location=DEVICE)
         init_step = ckpt["step"]
         n_steps = ckpt["number_of_steps"]
         model.load_state_dict(ckpt["model"])
         optim.load_state_dict(ckpt["optimizer"])
-        scaler.load_state_dict(ckpt["scaler"])
+        if scaler is not None:
+            scaler.load_state_dict(ckpt["scaler"])
+        print(f"Resume training from {init_step:,}/{n_steps:,} steps")
     else:
         init_step = 0
         n_steps = args.N_STEPS
@@ -246,9 +245,16 @@ def main():
         persistent_workers=True,
         num_workers=args.N_CPUS,
     )
-
     val_ds = VOC2012Dataset(img_dir=args.IMG_DIR, gt_dir=args.GT_DIR, split="val")
-    val_dl = DataLoader(val_ds, batch_size=1, shuffle=False, num_workers=args.N_CPUS)
+    val_dl = DataLoader(
+        val_ds,
+        batch_size=1,
+        shuffle=False,
+        pin_memory=True,
+        drop_last=False,
+        persistent_workers=True,
+        num_workers=args.N_CPUS,
+    )
 
     trainer = Trainer(
         train_dl=train_dl,

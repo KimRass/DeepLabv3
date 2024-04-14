@@ -9,4 +9,5 @@ python3 ../train.py\
     --save_dir="/Users/jongbeomkim/Documents/deeplabv3"\
     --batch_size=1\
     --n_cpus=1\
-    --n_steps=20_000\
+    --n_steps=30_000\
+    --resume_from="/Users/jongbeomkim/Documents/deeplabv3/step=6000.pth"\
