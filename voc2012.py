@@ -1,3 +1,7 @@
+# Sources:
+    # http://host.robots.ox.ac.uk/pascal/VOC/voc2012/#devkit
+    # https://www.dropbox.com/s/oeu149j8qtbs1x0/SegmentationClassAug.zip?dl=0&file_subpath=%2FSegmentationClassAug
+
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T

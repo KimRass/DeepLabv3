@@ -2,10 +2,7 @@
     # https://github.com/fregu856/deeplabv3/blob/master/utils/utils.py
 
 from PIL import Image
-from pathlib import Path
-from tqdm.auto import tqdm
 import torch
-import torchvision.transforms as T
 import torchvision.transforms.functional as TF
 from torchvision.utils import make_grid
 from time import time

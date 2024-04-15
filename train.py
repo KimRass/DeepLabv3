@@ -157,7 +157,7 @@ class Trainer(object):
         train_di = iter(self.train_dl)
 
         cum_loss = 0
-        min_avg_miou = math.inf
+        max_avg_miou = math.inf
         start_time = time()
         pbar = tqdm(range(init_step + 1, self.n_steps + 1), leave=False)
         for step in pbar:
@@ -180,8 +180,10 @@ class Trainer(object):
 
             if step % log_every == 0:
                 cum_loss /= log_every
-                log = f"[ {get_elapsed_time(start_time)} ][ {step:,}/{self.n_steps:,} ]\n"
+                log = f"[ {get_elapsed_time(start_time)} ]"
+                log += f"[ {step:,}/{self.n_steps:,} ]\n"
                 log += f"[ Loss: {cum_loss:.4f} ]"
+                print(log)
                 cum_loss = 0
                 start_time = time()
 
@@ -198,18 +200,20 @@ class Trainer(object):
 
             if step % val_every == 0:
                 avg_miou = self.validate(model=model)
-                if avg_miou < min_avg_miou:
+                if avg_miou > max_avg_miou:
                     self.save_model_params(
                         model=model,
                         save_path=self.save_dir/f"step={step}-avg_miou={avg_miou:.4f}.pth",
                     )
-                    min_avg_miou = avg_miou
-                log = f"[ {step:,}/{self.n_steps:,} ][ Average mIoU: {avg_miou:.4f} | {min_avg_miou:.4f} ]"
+                    max_avg_miou = avg_miou
+                log = f"[ {step:,}/{self.n_steps:,} ]"
+                log += f"[ Average mIoU: {avg_miou:.4f} | {max_avg_miou:.4f} ]"
                 print(log)
 
 
 def main():
     DEVICE = get_device()
+    print(f"[ DEVICE: {DEVICE} ]")
     args = get_args()
     set_seed(args.SEED)
 

@@ -4,10 +4,10 @@ source ../../venv/cv/bin/activate
 source set_pythonpath.sh
 
 python3 ../train.py\
-    --img_dir="/Users/jongbeomkim/Documents/datasets/voc2012/VOCdevkit/VOC2012/JPEGImages"\
-    --gt_dir="/Users/jongbeomkim/Documents/datasets/SegmentationClassAug"\
-    --save_dir="/Users/jongbeomkim/Documents/deeplabv3"\
-    --batch_size=1\
-    --n_cpus=1\
+    --img_dir="/home/jbkim/Documents/datasets/VOCtrainval_11-May-2012/VOCdevkit/VOC2012/JPEGImages"\
+    --gt_dir="/home/jbkim/Documents/datasets/SegmentationClassAug/SegmentationClassAug"\
+    --save_dir="/home/jbkim/Documents/deeplabv3"\
+    --batch_size=8\
+    --n_cpus=4\
     --n_steps=30_000\
-    --resume_from="/Users/jongbeomkim/Documents/deeplabv3/step=6000.pth"\
+    --init_lr=0.0002\
