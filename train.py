@@ -3,7 +3,7 @@
 
 import torch
 from torch.utils.data import DataLoader
-from torch.optim import SGD
+from torch.optim import SGD, AdamW
 from pathlib import Path
 from time import time
 import contextlib
@@ -28,8 +28,8 @@ def get_args():
     parser.add_argument("--resume_from", type=str, required=False)
     ### Optimizer
     parser.add_argument("--init_lr", type=float, required=False, default=0.007)
-    parser.add_argument("--momentum", type=float, required=False, default=0.9)
-    parser.add_argument("--weight_decay", type=float, required=False, default=0.0004)
+    # parser.add_argument("--momentum", type=float, required=False, default=0.9)
+    # parser.add_argument("--weight_decay", type=float, required=False, default=0.0008)
     ### Logging
     parser.add_argument("--log_every", type=int, required=False, default=500)
     parser.add_argument("--save_every", type=int, required=False, default=6000)
@@ -219,12 +219,13 @@ def main():
     set_seed(args.SEED)
 
     model = ResNet101DeepLabv3(output_stride=16).to(DEVICE)
-    optim = SGD(
-        params=model.parameters(),
-        lr=args.INIT_LR,
-        momentum=args.MOMENTUM,
-        weight_decay=args.WEIGHT_DECAY,
-    )
+    # optim = SGD(
+    #     params=model.parameters(),
+    #     lr=args.INIT_LR,
+    #     momentum=args.MOMENTUM,
+    #     weight_decay=args.WEIGHT_DECAY,
+    # )
+    optim = AdamW(params=model.parameters(), lr=args.INIT_LR)
     scaler = get_grad_scaler(device=DEVICE)
 
     if args.RESUME_FROM is not None:
