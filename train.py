@@ -147,6 +147,7 @@ class Trainer(object):
     def train(
         self,
         init_step,
+        max_avg_miou,
         model,
         optim,
         scaler,
@@ -157,7 +158,6 @@ class Trainer(object):
         train_di = iter(self.train_dl)
 
         cum_loss = 0
-        max_avg_miou = 0
         start_time = time()
         pbar = tqdm(range(init_step + 1, self.n_steps + 1), leave=False)
         for step in pbar:
@@ -231,6 +231,7 @@ def main():
         ckpt = torch.load(args.RESUME_FROM, map_location=DEVICE)
         init_step = ckpt["step"]
         n_steps = ckpt["number_of_steps"]
+        max_avg_miou = ckpt["maximum_average_mean_iou"]
         model.load_state_dict(ckpt["model"])
         optim.load_state_dict(ckpt["optimizer"])
         if scaler is not None:
@@ -239,6 +240,7 @@ def main():
     else:
         init_step = 0
         n_steps = args.N_STEPS
+        max_avg_miou = 0
 
     train_ds = VOC2012Dataset(img_dir=args.IMG_DIR, gt_dir=args.GT_DIR, split="train")
     train_dl = DataLoader(
@@ -271,6 +273,7 @@ def main():
     )
     trainer.train(
         init_step=init_step,
+        max_avg_miou=max_avg_miou,
         model=model,
         optim=optim,
         scaler=scaler,
