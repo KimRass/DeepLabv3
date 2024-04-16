@@ -9,7 +9,6 @@ from time import time
 import contextlib
 from tqdm import tqdm
 import argparse
-import math
 
 from voc2012 import VOC2012Dataset
 from model import ResNet101DeepLabv3
@@ -106,13 +105,14 @@ class Trainer(object):
         # loss = torch.randn(size=(1,), device=self.device)
         return loss
 
-    def save_checkpoint(self, step, model, optim, scaler, save_path):
+    def save_checkpoint(self, step, model, optim, scaler, max_avg_miou, save_path):
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         ckpt = {
             "step": step,
             "number_of_steps": self.n_steps,
             "model": model.state_dict(),
             "optimizer": optim.state_dict(),
+            "maximum_average_mean_iou": max_avg_miou,
         }
         if scaler is not None:
             ckpt["scaler"] = scaler.state_dict()
@@ -157,7 +157,7 @@ class Trainer(object):
         train_di = iter(self.train_dl)
 
         cum_loss = 0
-        max_avg_miou = math.inf
+        max_avg_miou = 0
         start_time = time()
         pbar = tqdm(range(init_step + 1, self.n_steps + 1), leave=False)
         for step in pbar:
@@ -193,6 +193,7 @@ class Trainer(object):
                     model=model,
                     optim=optim,
                     scaler=scaler,
+                    max_avg_miou=max_avg_miou,
                     save_path=self.save_dir/f"step={step}.pth",
                 )
                 log = f"[ {step:,}/{self.n_steps:,} ][ Checkpoint saved. ]"

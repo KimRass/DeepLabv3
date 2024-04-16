@@ -11,3 +11,4 @@ python3 ../train.py\
     --n_cpus=4\
     --n_steps=30_000\
     --init_lr=0.0002\
+    --resume_from="/home/jbkim/Documents/deeplabv3/step=18000.pth"
