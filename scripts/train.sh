@@ -9,5 +9,6 @@ python3 ../train.py\
     --save_dir="/home/jbkim/Documents/deeplabv3/adamw"\
     --batch_size=8\
     --n_cpus=4\
-    --n_steps=30_000\
+    --n_steps=54_000\
     --init_lr=0.0004\
+    --resume_from="/home/jbkim/Documents/deeplabv3/adamw/step=42000.pth"
