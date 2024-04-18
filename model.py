@@ -317,3 +317,23 @@ class ResNet101DeepLabv3(nn.Module):
 
             ious[c] = round(iou, 4)
         return ious
+
+
+if __name__ == "__main__":
+    import os
+
+
+    def calculate_model_size(model):
+        total_params = 0
+        for param in model.parameters():
+            total_params += param.numel() * param.element_size()
+        return total_params
+
+
+    model = ResNet101DeepLabv3().cuda()
+    print(f"{calculate_model_size(model) / 2 ** 10 / 2 ** 10:,}")
+
+    torch.save(model.state_dict(), 'model_checkpoint.pth')
+    file_path = 'model_checkpoint.pth'
+    file_size_bytes = os.path.getsize(file_path)
+    print(f"{file_size_bytes / 2 ** 10 / 2 ** 10:,}")

@@ -3,7 +3,7 @@
 # 1. Pre-traind Models
 | | |
 |:-|:-|
-| [deeplabv3-voc2012.pt](https://drive.google.com/file/d/1hop_eH6MD-ng7bfg8iS9VW2EGT7_Fm19/view?usp=sharing) | - Trained on VOC 2012 training set for 18,000 steps.<br>- Average mIoU on VOC 2012 validation set: 0.6643 |
+| [deeplabv3-voc2012.pt](https://drive.google.com/file/d/1iN8FI1kiaZycrRZWi7YIk3X-3xnBjKFw/view?usp=sharing) | - Trained on VOC 2012 training set for 54,000 steps.<br>- Average mIoU on VOC 2012 validation set: 0.6563 |
 
 # 2. Prediction on VOC 2012 Validation Set
 | Ground truth | Prediction |
