@@ -277,8 +277,9 @@ class ResNet101DeepLabv3(nn.Module):
 
     def get_loss(self, image, gt):
         """
-        "Our loss function is the sum of cross-entropy terms for each spatial position in the CNN output map."
-        "All positions and labels are equally weighted in the overall loss function."
+        "Our loss function is the sum of cross-entropy terms for each spatial position in
+        the CNN output map." All positions and labels are equally weighted in the overall
+        loss function."
         "Our targets are the ground truth labels."
 
         References:
